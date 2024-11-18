@@ -53,5 +53,6 @@ RUN mkdir -p build
 WORKDIR /workspace/build
 RUN cmake .. && make -j$(nproc)
 
-# Commande par défaut pour exécuter un shell dans le conteneur (peut être ajusté pour exécuter le binaire si nécessaire)
-CMD ["/bin/bash"]
+# Launch command
+# CMD ["/bin/bash"]
+CMD ["./main"]

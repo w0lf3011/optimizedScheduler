@@ -4,10 +4,10 @@
 IMAGE_BASE_NAME="pico_task_manager"
 
 # Iteration number
-ITERATIONS=7
+ITERATIONS=1
 
 # work folder where Iteration folder are.
-CODE_DIR="./"
+CODE_DIR="."
 
 # Loop on each # Iterations.
 for i in $(seq 0 $ITERATIONS); do

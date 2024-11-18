@@ -9,7 +9,7 @@ IMAGE_BASE_NAME="pico_task_manager"
 DURATIONS=(10 60)
 
 # Iteration Number
-ITERATIONS=7
+ITERATIONS=1
 
 # Location of Python script for Monitoring
 MONITOR_SCRIPT="monitor_metrics.py"
@@ -21,8 +21,8 @@ for i in $(seq 0 $ITERATIONS); do
     for duration in "${DURATIONS[@]}"; do
         echo "Running Docker container for image $IMAGE_NAME for $duration seconds..."
         
-        # Run contener in deamon mode
-        CONTAINER_ID=$(docker run -d "$IMAGE_NAME")
+        # Create container in detach mode
+        CONTAINER_ID=$(docker run -dit "$IMAGE_NAME")
 
         # Run Monitoring Script
         python3 "$MONITOR_SCRIPT" "$CONTAINER_ID" "$duration" "metrics_${IMAGE_NAME}_${duration}.log"
