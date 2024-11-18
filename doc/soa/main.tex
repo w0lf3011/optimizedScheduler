@@ -1,0 +1,130 @@
+\documentclass[12pt,a4paper]{article}
+
+\usepackage[margin = 1.25 in ]{geometry}
+\usepackage{graphicx} % Required for inserting images
+\usepackage[english]{babel}
+\usepackage[T1]{fontenc}
+\usepackage{listings} % to print code
+\usepackage{hyperref} % to manage hyperlink
+\usepackage[acronym, toc]{glossaries} % to manage glossary
+\usepackage[backend=biber, style=ieee]{biblatex} % Usage of IEEE style for References
+\usepackage{titletoc} % Library to customize the Table of Content
+\usepackage{csquotes}
+\usepackage{booktabs} % For Tables
+%\usepackage[firstpage]{draftwatermark}
+%\SetWatermarkText{Draft}
+%\SetWatermarkScale{5}
+
+% Import References file
+\addbibresource{references.bib}
+
+
+\title{State of the Art\\Optimal scheduling for energy-harvesting batteryless sensory systems}
+\author{Professors:\\Pierre-Yves Schobbens\\Laurent Schumacher\\Student: Quentin Franssen}
+\date{11 March 2024}
+
+
+% \dottedcontents{<section>}[<left>]{<above-code>}
+% {<label width>}{<leader width>}
+\dottedcontents{section}[0em]{\bfseries}{2.9em}{1pc}
+\dottedcontents{subsection}[2em]{}{3.3em}{1pc}
+%\dottedcontents{subsubsection}[4em]{}{3.3em}{1pc}
+
+% center the toc heading
+\renewcommand{\contentsname}{\centering Contents}
+
+
+% Creating the glossary
+\makeglossaries
+
+
+
+\begin{document}
+
+    % Load Glossary entries
+    \include{glossary}
+
+    \begin{figure}
+        \centering
+        \includegraphics[scale=0.5]{img/UNamur_Logo.jpg}
+        \label{fig:lgo_unamur}
+    \end{figure}
+    
+    \maketitle
+    \newpage
+
+    
+    \tableofcontents
+
+    \newpage
+    \include{chapt1} % Introduction
+
+    \newpage
+    \include{chapt2} % Context
+
+    \newpage
+    \include{chapt3} % Primary Challenge
+
+    \newpage
+    \include{chapt4} % Secondary Challenge
+
+    \newpage
+    \section{Limitations}
+
+        \paragraph{}
+        The section effectively consolidates common limitations in the development and implementation of energy-efficient technologies and systems. It highlights five main areas: technological and economic challenges, performance trade-offs, infrastructure and policy constraints, integration challenges, and the complexity and cost of advanced techniques. Each point underscores critical barriers to scalability and adoption, pointing to the need for innovative solutions, supportive policies, and infrastructure improvements to overcome these hurdles and advance the sustainability of \gls{iot} and energy harvesting systems.
+
+
+
+    \section{Potential Future Directions}
+
+        \paragraph{}
+        How can adaptive algorithms be designed and optimized to efficiently manage energy resources in \gls{iot} devices, taking into account factors such as energy availability, process priority, storage options, and operational frequency, to ensure the successful execution of processes?
+
+        \paragraph{}
+        This main question can be split into several sub questions:
+        \begin{itemize}
+            \item \textbf{Optimization in Ultra-Low Power Contexts}: In the context of ultra-low power, IoT, and battery-less environments, what strategies are most effective for designing and optimizing adaptive algorithms?
+            \item \textbf{Decision-Making Based on Inputs}: How can an algorithm dynamically make optimal decisions to ensure successful process execution, considering varying inputs?
+            \item \textbf{Algorithm Impact on System Resources}: How Algorithm can be adapted to different architectures (considering processor types, frequency, number of cores, etc.)?
+            \item \textbf{System Resources influence Algorithm}: How the system resources (processor types, frequency, number of cores, ...) are impacting the adaptive algorithm?
+            \item \textbf{Compiler Choice and Energy Consumption}: Does the choice of compiler have an impact on optimizing energy consumption, and if so, how?
+            \item \textbf{Methodology Abstraction for Architectural Adaptability}: How can we improve the abstraction of adaptive algorithm methodologies to be applicable across different architectures?
+            \item \textbf{"Rebound Effect" in Optimal Scheduling Algorithms}: What is the "Rebound Effect" resulting from the implementation of optimal scheduling algorithms, and how does it affect energy consumption?
+            \item \textbf{Comparative Impact on Device vs. Core Consumption}: How does the adoption of adaptive algorithms affect the overall device consumption compared to core consumption specifically?
+            \item \textbf{Application of \gls{process}, \gls{task}, and \gls{fsm}}: In the context of adaptive algorithms, how can processes, tasks, and FSMs be utilized effectively?
+            \item \textbf{Completeness of Energy Complexity Theory}: Is the theory of energy complexity comprehensive enough to encompass the nuances of adaptive algorithm design in IoT devices?
+        \end{itemize}
+
+
+
+    \newpage
+    \section{Conclusion}
+
+        \paragraph{}
+        This State of the Art unveils the intricate layers of sustainability in IoT ecosystems, particularly emphasizing the pivotal roles of Energy Harvesting, Efficiency, and Resilience.
+        
+        \paragraph{}
+        By methodically dissecting the spectrum of challenges—from their genesis to current mitigative strategies and inherent limitations—this document lays a comprehensive foundation for understanding sustainability's multifaceted impact on IoT. Moreover, it critically evaluates these challenges, paving the way for future research through proposed thesis questions.
+        
+        \paragraph{}
+        These inquiries, rooted in the document’s analytical insights, invite exploration beyond conventional boundaries, promising innovative solutions for a sustainable technological future.
+
+    \newpage
+    \include{appendix}
+    
+    			
+    
+
+
+
+
+    
+    \newpage
+    % Displaying the glossary at the end of the article and print it into ToC
+    \printglossary[type=\acronymtype]
+    \printglossary[type=main]
+
+    \printbibliography[heading=bibintoc]
+
+\end{document}
