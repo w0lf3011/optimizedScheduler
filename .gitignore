@@ -42,6 +42,9 @@
 *.idb
 *.pdb
 
+# Backup files
+*.bak
+
 # Kernel Module Compile Results
 *.mod*
 *.cmd
@@ -50,3 +53,7 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
+
+# Folder to exclude
+output/*
+venv/*

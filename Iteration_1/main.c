@@ -1,9 +1,9 @@
-#include "pico/stdlib.h"
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
+#include <unistd.h>
 
 #define NUM_MEASURES 10       // Nombre de mesures stockées
 #define LED_PIN 25            // Pin GPIO pour la LED
@@ -26,9 +26,7 @@ bool buffer_full = false; // Indique si le buffer circulaire est plein
 
 // Initialisation des périphériques
 void init_peripherals() {
-    stdio_init_all();
-    gpio_init(LED_PIN);
-    gpio_set_dir(LED_PIN, GPIO_OUT);
+    printf("Initializing peripherals (simulated for Linux)...\n");
 }
 
 // Fonction pour lire la température
@@ -49,13 +47,20 @@ float average() {
 
 // Fonction pour allumer la LED X fois
 void blink_led(uint8_t times) {
+    printf("Simulating blinking LED %d times...\n", times);
     for (uint8_t i = 0; i < times; i++) {
-        gpio_put(LED_PIN, 1);
-        sleep_ms(200);
-        gpio_put(LED_PIN, 0);
-        sleep_ms(200);
+        printf("LED ON\n");
+        usleep(200000);  // 200 ms
+        printf("LED OFF\n");
+        usleep(200000);
     }
 }
+
+// Fonction pour simuler un sleep
+void sleep_ms(uint32_t ms) {
+    usleep(ms * 1000);  // Convertit ms en µs
+}
+
 
 // Tâche: Obtenir la température actuelle du capteur
 void runTempTask() {

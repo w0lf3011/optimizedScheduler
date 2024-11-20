@@ -1,10 +1,10 @@
 #!/bin/bash
 
 # Project name
-IMAGE_BASE_NAME="pico_task_manager"
+IMAGE_BASE_NAME="optimizedscheduler"
 
 # Iteration number
-ITERATIONS=1
+ITERATIONS=7
 
 # work folder where Iteration folder are.
 CODE_DIR="."
@@ -12,7 +12,7 @@ CODE_DIR="."
 # Loop on each # Iterations.
 for i in $(seq 0 $ITERATIONS); do
     
-    IMAGE_NAME="${IMAGE_BASE_NAME}_${i}"
+    IMAGE_NAME="${IMAGE_BASE_NAME}${i}"
     echo "Image name $IMAGE_NAME"
 
     ITERATION_DIR="${CODE_DIR}/iteration_${i}"
