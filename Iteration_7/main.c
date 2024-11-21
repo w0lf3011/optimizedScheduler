@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <stddef.h>
 
 #define NUM_MEASURES 10
@@ -32,8 +33,14 @@ GoalParameters global_goal_params;
 
 // Fonction pour lire la température
 float read_temperature() {
-    float temp = 25.0;  // Exemple de température simulée
-    return temp;
+    // Set the range
+    float min = -40.0f;
+    float max = 60.0f;
+
+    float temp = min + ((float)rand() / (float)RAND_MAX) * (max - min);
+    float temp_1d = ((int)(temp * 10)) / 10.0f;
+    printf("Read a temperature of %.f\n", temp_1d);
+    return temp_1d;
 }
 
 // Fonction pour calculer la moyenne des températures
@@ -78,6 +85,11 @@ void update_simulated_hour() {
     }
 }
 
+
+// Fonction pour obtenir l'heure simulée
+uint8_t get_current_hour() {
+    return simulated_hour;
+}
 
 
 

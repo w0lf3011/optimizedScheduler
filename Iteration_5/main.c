@@ -68,8 +68,14 @@ void init_peripherals() {
 
 // Fonction pour lire la température
 float read_temperature() {
-    float temp = 25.0;  // Exemple de température simulée
-    return temp;
+    // Set the range
+    float min = -40.0f;
+    float max = 60.0f;
+
+    float temp = min + ((float)rand() / (float)RAND_MAX) * (max - min);
+    float temp_1d = ((int)(temp * 10)) / 10.0f;
+    printf("Read a temperature of %.f\n", temp_1d);
+    return temp_1d;
 }
 
 // Fonction pour calculer la moyenne des températures

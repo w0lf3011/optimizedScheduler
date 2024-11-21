@@ -5,6 +5,17 @@ import sys
 
 def monitor_container_metrics(container_id, duration, output_file):
     client = docker.from_env()
+    
+    # try:
+    #     stats = client.api.inspect_container(container_id)
+        
+    #     # Vérification des clés
+    #     if 'system_cpu_usage' in stats['cpu_stats'] and 'system_cpu_usage' in stats['precpu_stats']:
+    #         system_delta = stats['cpu_stats']['system_cpu_usage'] - stats['precpu_stats']['system_cpu_usage']
+    #     else:
+    #         print(f"Missing 'system_cpu_usage' for container {container_id}")
+    #         return  # Ignore ce conteneur ou applique une valeur par défaut
+        
     container = client.containers.get(container_id)
 
     with open(output_file, 'w') as f:
@@ -32,6 +43,10 @@ def monitor_container_metrics(container_id, duration, output_file):
             time.sleep(1)  # Intervalle de mesure (1 seconde)
 
     print(f"Metrics saved to {output_file}")
+    # except KeyError as e:
+    #     print(f"KeyError: {e} in container {container_id}")
+    # except Exception as e:
+    #     print(f"Unexpected error: {e} in container {container_id}")
 
 if __name__ == "__main__":
     if len(sys.argv) != 4:

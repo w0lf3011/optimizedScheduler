@@ -1,4 +1,6 @@
 #include <stdint.h>
+#include <unistd.h>
+#include <stdio.h>
 
 #ifndef HARDWARE_ABSTRACTION_H
 #define HARDWARE_ABSTRACTION_H

@@ -1,5 +1,5 @@
 #include "hardware_abstraction.h"
-#include <stdio.h>
+
 
 
 void init_peripherals() {
