@@ -83,11 +83,11 @@ void sendResultTask() {
 
 void task_scheduler() {
     runTempTask();
-    sleep_ms(5000);
+    sleep_ms(1000);
     runTempTask();
-    sleep_ms(5000);
+    sleep_ms(1000);
     runTempTask();
-    sleep_ms(5000);
+    sleep_ms(1000);
     computeAvgTempTask();
     sendResultTask();
 }
@@ -97,7 +97,7 @@ int main() {
 
 		int counter = 10;
 	
-    while (true) {
+    while (counter>0) {
         task_scheduler();
         sleep_ms(1000);
 				counter--;

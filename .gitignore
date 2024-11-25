@@ -57,3 +57,4 @@ dkms.conf
 # Folder to exclude
 output/*
 venv/*
+bin/*
