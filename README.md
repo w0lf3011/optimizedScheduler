@@ -52,11 +52,11 @@ To explore or contribute to the project:
 
 
 ## Documentation
-Detailed documentation for each iteration is available within the respective directories. The doc/soa directory contains the state-of-the-art analysis and other relevant documents.
+Detailed documentation for each iteration is available within the respective directories. The `doc/soa` directory contains the state-of-the-art analysis and other relevant documents.
 
 
 ## Contributing
 Contributions are welcome. Please fork the repository and submit a pull request with your proposed changes.
 
 ## License
-This project is licensed under the GNU General Public License v2.0. See the LICENSE file for more details.
+This project is licensed under the GNU General Public License v2.0. See the `LICENSE` file for more details.
