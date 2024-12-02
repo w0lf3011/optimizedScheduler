@@ -103,8 +103,8 @@ void sendResultTask() {
 
 // Fonction pour trier les tâches en fonction du poids et de la priorité
 int compare_tasks(const void* a, const void* b) {
-    Task* taskA = (Task*)a;
-    Task* taskB = (Task*)b;
+    Task* taskA = *(Task**)a;
+    Task* taskB = *(Task**)b;
     // Tâches avec une priorité plus élevée ou un poids inférieur sont préférées
     if (taskA->priority != taskB->priority) {
         return taskB->priority - taskA->priority;
@@ -113,28 +113,32 @@ int compare_tasks(const void* a, const void* b) {
 }
 
 // Fonction pour exécuter les tâches dans l'ordre des priorités et dépendances
-void execute_tasks(Task* tasks, uint8_t task_count) {
+void execute_tasks(Task* tasks[], uint8_t task_count) {
     // Tri des tâches par priorité et poids
-    qsort(tasks, task_count, sizeof(Task), compare_tasks);
+    qsort(tasks, task_count, sizeof(Task*), compare_tasks);
 
-    // Exécuter les tâches en tenant compte des dépendances
+    bool task_completed[task_count];
     for (uint8_t i = 0; i < task_count; i++) {
-        Task* task = &tasks[i];
-        
-        // Vérifier que toutes les dépendances sont terminées
+        task_completed[i] = false;
+    }
+
+    for (uint8_t i = 0; i < task_count; i++) {
+        Task* task = tasks[i];
         bool ready_to_run = true;
+
+        // Check Dependencies
         for (uint8_t j = 0; j < task->num_dependencies; j++) {
             Task* dependency = task->dependencies[j];
-            if (dependency) {
+            if (!task_completed[i]) {
                 ready_to_run = false;
                 break;
             }
         }
-        
-        // Exécuter la tâche si elle est prête
+
         if (ready_to_run) {
             task->taskFunction();
-            sleep_ms(task->delay_ms); // Temps de repos après exécution
+            task_completed[i] = true;
+            sleep_ms(task->delay_ms);
         }
     }
 }
@@ -142,33 +146,26 @@ void execute_tasks(Task* tasks, uint8_t task_count) {
 int main(int argc, char *argv[]) {
     init_peripherals();
 
-    int loop_count = 0;
-    bool infinite_loop = true;
-
-    if (argc > 1) {
-        loop_count = atoi(argv[1]); // Convertir l'argument en entier
-        if (loop_count < 0) {
-            printf("Invalid argument. Usage: %s <loop count>.\n", argv[0]);
-            return 1;
-        } else {
-            infinite_loop = (loop_count == 0);
-        }
-    }
+    int loop_count = (argc > 1) ? atoi(argv[1]) : 0;
+    bool infinite_loop = (loop_count == 0);
 
     // Création des tâches avec leurs fonctions, délais, priorités et poids
-    Task runTempTaskStruct = { runTempTask, 5000, 2, 3, NULL, 0 };
-    Task computeAvgTempTaskStruct = { computeAvgTempTask, 5000, 1, 2, NULL, 0 };
-    Task sendResultTaskStruct = { sendResultTask, 1000, 3, 1, NULL, 0 };
+    static Task runTempTaskStruct = { runTempTask, 5000, 3, 1, NULL, 0 };
+    static Task computeAvgTempTaskStruct = { computeAvgTempTask, 5000, 2, 2, NULL, 0 };
+    static Task sendResultTaskStruct = { sendResultTask, 1000, 1, 3, NULL, 0 };
+    
+    static Task* dependencies[] = { &computeAvgTempTaskStruct };
+    sendResultTaskStruct.dependencies = dependencies;
+    sendResultTaskStruct.num_dependencies = 1;
 
     // Initialisation des dépendances
     Task* tasks[] = { &runTempTaskStruct, &computeAvgTempTaskStruct, &sendResultTaskStruct };
     uint8_t task_count = sizeof(tasks) / sizeof(tasks[0]);
-
-    // Ajouter des dépendances si nécessaire
-    // Exemple : sendResultTask dépend de computeAvgTempTask
-    sendResultTaskStruct.dependencies = &computeAvgTempTaskStruct;
-    sendResultTaskStruct.num_dependencies = 1;
-
+    
+    printf("Num Dep: %d\n", sendResultTaskStruct.num_dependencies);
+    printf("Num Dep 0 tasks: %d\n", tasks[0]->num_dependencies);
+    printf("Num Dep 1 tasks: %d\n", tasks[1]->num_dependencies);
+    printf("Num Dep 2 tasks: %d\n", tasks[2]->num_dependencies);
 
     while (infinite_loop || loop_count>0) {
         execute_tasks(tasks, task_count);

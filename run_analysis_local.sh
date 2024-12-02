@@ -70,7 +70,7 @@ for i in $(seq 0 $ITERATIONS); do
     # Execute the APP, only with the Core CPU_CORE to measure the Usage of one CPU Core and estimate the consumption.
     taskset -c ${CPU_CORE} "${APP}" 5 &>> "${LOG_FILE}"
     if [ $? -ne 0 ]; then
-        echo "Error: Valgrind execution failed for iteration ${i}. Check ${LOG_FILE} for details."
+        echo "Error: execution failed for iteration ${i}. Check ${LOG_FILE} for details."
         echo "${?}" &>> "${LOG_FILE}"
         continue
     fi
