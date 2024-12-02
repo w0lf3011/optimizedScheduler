@@ -14,11 +14,16 @@ TaskQueue* init_task_queue(uint8_t capacity) {
 void enqueue_task(TaskQueue* queue, Task* task) {
     if (queue->size < queue->capacity) {
         queue->tasks[queue->size++] = task;
-        for (int i = queue->size - 1; i > 0; i--) {
-            if (queue->tasks[i]->heuristic_metric > queue->tasks[i - 1]->heuristic_metric) {
+        
+        // Heapify up to maintain heap property
+        int i = queue->size - 1;
+        while (i > 0) {
+            int parent = (i - 1) / 2;
+            if (queue->tasks[i]->heuristic_metric > queue->tasks[parent]->heuristic_metric) {
                 Task* temp = queue->tasks[i];
-                queue->tasks[i] = queue->tasks[i - 1];
-                queue->tasks[i - 1] = temp;
+                queue->tasks[i] = queue->tasks[parent];
+                queue->tasks[parent] = temp;
+                i = parent;
             } else {
                 break;
             }
@@ -33,6 +38,30 @@ Task* dequeue_task(TaskQueue* queue) {
         handle_error("Task queue is empty");
         return NULL;
     }
+
+    // Heapify down to maintain heap property
+    int i = 0;
+    while (i < queue->size) {
+        int left = 2 * i + 1;
+        int right = 2 * i + 2;
+        int largest = i;
+
+        if (left < queue->size && queue->tasks[left]->heuristic_metric > queue->tasks[largest]->heuristic_metric) {
+            largest = left;
+        }
+        if (right < queue->size && queue->tasks[right]->heuristic_metric > queue->tasks[largest]->heuristic_metric) {
+            largest = right;
+        }
+        if (largest != i) {
+            Task* temp = queue->tasks[i];
+            queue->tasks[i] = queue->tasks[largest];
+            queue->tasks[largest] = temp;
+            i = largest;
+        } else {
+            break;
+        }
+    }
+
     return queue->tasks[--queue->size];
 }
 
@@ -42,18 +71,20 @@ void free_task_queue(TaskQueue* queue) {
 }
 
 void execute_tasks(TaskQueue* queue, EnergySource* source, GoalParameters* goal_params) {
-    for (int i = 0; i < queue->size; i++) {
-        Task* task = queue->tasks[i];
-        if (task->num_dependencies > 0) {
-            for (int j = 0; j < task->num_dependencies; j++) {
-                if (task->dependencies[j] != NULL) {
-                    task->taskFunction();
-                    delay(task->delay_ms);
-                } else {
-                    handle_error("Dependency error");
-                }
+    while (queue->size > 0) {
+        Task* task = dequeue_task(queue);
+
+        // Validate dependencies
+        bool dependencies_met = true;
+        for (int j = 0; j < task->num_dependencies; j++) {
+            if (task->dependencies[j] != NULL) {
+                dependencies_met = false;
+                handle_error("Dependency error: Unmet dependencies.");
+                break;
             }
-        } else {
+        }
+
+        if (dependencies_met) {
             task->taskFunction();
             delay(task->delay_ms);
         }

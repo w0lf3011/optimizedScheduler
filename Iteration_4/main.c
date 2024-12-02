@@ -56,6 +56,14 @@ uint8_t simulated_day = 0;    // Jour simulé pour la durée de simulation
 
 // Variable globale pour stocker les paramètres de l'objectif
 GoalParameters global_goal_params;
+uint8_t global_taskcounter = 0;
+
+// Increment Task Counter and show the task name.
+void incrementTaskCounter(const char *taskName) {
+    global_taskcounter++;
+    printf("%d tasks executed so far. Last task: %s\n", global_taskcounter, taskName);
+}
+
 
 // Initialisation des périphériques
 void init_peripherals() {
@@ -105,6 +113,7 @@ void runTempTask() {
     temperature_values[measure_index] = read_temperature();
     measure_index = (measure_index + 1) % NUM_MEASURES;
     if (measure_index == 0) buffer_full = true;
+    incrementTaskCounter("runTempTask");
 }
 
 // Tâche: Calculer la moyenne des températures collectées
@@ -112,6 +121,7 @@ void computeAvgTempTask() {
     if (buffer_full) {  // Calcul seulement quand le buffer est plein
         float average_temp = average();
         printf("Average of collected temperatures: %.2f°C\n", average_temp);
+        incrementTaskCounter("computeAvgTempTask");
     }
 }
 
@@ -121,6 +131,7 @@ void sendResultTask() {
         blink_led(NUM_MEASURES);
         buffer_full = false;
         measure_index = 0;
+        incrementTaskCounter("sendResultTask");
     }
 }
 
@@ -209,8 +220,23 @@ void execute_tasks(Task* tasks, uint8_t task_count, EnergySource *source, GoalPa
     }
 }
 
-int main() {
+int main(int argc, char *argv[]) {
     init_peripherals();
+
+    int loop_count = 0;
+    bool infinite_loop = true;
+
+    if (argc > 1) {
+        loop_count = atoi(argv[1]); // Convertir l'argument en entier
+        if (loop_count < 0) {
+            printf("Invalid argument. Usage: %s <loop count>.\n", argv[0]);
+            return 1;
+        } else {
+            infinite_loop = (loop_count == 0);
+        }
+    }
+    int duration_days = loop_count;
+	
 
     Task runTempTaskStruct = { runTempTask, 5000, 2, 3, false, NULL, 0 };
     Task computeAvgTempTaskStruct = { computeAvgTempTask, 5000, 1, 2, true, NULL, 0 };
@@ -224,9 +250,9 @@ int main() {
 
     EnergySource energy_source = { WIND, 6, 3, 3 };
 
-    GoalParameters goal_params = { MAXIMIZE_RESILIENCE, 5 }; // Objectif de résilience pour 5 jours
+    GoalParameters goal_params = { MAXIMIZE_RESILIENCE, duration_days }; // Objectif de résilience pour 5 jours
 
-    while (simulated_day < goal_params.duration_days) {
+    while (infinite_loop || simulated_day < goal_params.duration_days) {
         execute_tasks(tasks, task_count, &energy_source, &goal_params);
         sleep_ms(1000);
         update_simulated_hour();

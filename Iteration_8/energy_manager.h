@@ -37,4 +37,6 @@ float predict_energy(TinyMLModel* ml_model, const float* input, size_t input_len
 void update_energy_profile(EnergySource *source);
 bool is_energy_available(EnergySource *source);
 
+void integrate_real_energy_profiler();
+
 #endif

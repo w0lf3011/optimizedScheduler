@@ -1,0 +1,71 @@
+Initializing peripherals (simulated for Linux)...
+Read a temperature of 44
+Read a temperature of -0
+Read a temperature of 38
+Read a temperature of 40
+Read a temperature of 51
+Read a temperature of -20
+Read a temperature of -6
+Read a temperature of 37
+Read a temperature of -12
+Read a temperature of 15
+Average of collected temperatures: 18.60°C
+Simulating blinking LED 10 times...
+LED ON
+LED OFF
+LED ON
+LED OFF
+LED ON
+LED OFF
+LED ON
+LED OFF
+LED ON
+LED OFF
+LED ON
+LED OFF
+LED ON
+LED OFF
+LED ON
+LED OFF
+LED ON
+LED OFF
+LED ON
+LED OFF
+Read a temperature of 8
+Read a temperature of 23
+Read a temperature of -4
+Read a temperature of 11
+Read a temperature of 55
+Read a temperature of 52
+Read a temperature of 24
+Read a temperature of 32
+Read a temperature of -26
+Read a temperature of 21
+Average of collected temperatures: 19.51°C
+Simulating blinking LED 10 times...
+LED ON
+LED OFF
+LED ON
+LED OFF
+LED ON
+LED OFF
+LED ON
+LED OFF
+LED ON
+LED OFF
+LED ON
+LED OFF
+LED ON
+LED OFF
+LED ON
+LED OFF
+LED ON
+LED OFF
+LED ON
+LED OFF
+Read a temperature of -38
+Read a temperature of -16
+Read a temperature of -26
+Read a temperature of 40
+Read a temperature of -24
+Read a temperature of 0

@@ -13,6 +13,13 @@
 // Variables pour stocker les mesures et les calculs
 float temperature_values[NUM_MEASURES];
 uint8_t measure_count = 0;
+uint8_t global_taskcounter = 0;
+
+// Increment Task Counter and show the task name.
+void incrementTaskCounter(const char *taskName) {
+    global_taskcounter++;
+    printf("%d tasks executed so far. Last task: %s\n", global_taskcounter, taskName);
+}
 
 // Initialisation des périphériques
 void init_peripherals() {
@@ -61,6 +68,7 @@ void runTempTask() {
     if (measure_count < NUM_MEASURES) {
         temperature_values[measure_count] = read_temperature();
         measure_count++;
+        incrementTaskCounter("runTempTask");
     }
 }
 
@@ -69,6 +77,7 @@ void computeAvgTempTask() {
     if (measure_count == NUM_MEASURES) {
         float average_temp = average();
         printf("Average of collected temperatures: %.2f°C\n", average_temp);
+        incrementTaskCounter("computeAvgTempTask");
     }
 }
 
@@ -77,6 +86,7 @@ void sendResultTask() {
     if (measure_count == NUM_MEASURES) {
         blink_led(measure_count);
         measure_count = 0;  // Réinitialiser le compteur de mesures
+        incrementTaskCounter("sendResultTask");
     }
 }
 
@@ -92,14 +102,25 @@ void task_scheduler() {
     sendResultTask();
 }
 
-int main() {
+int main(int argc, char *argv[]) {
     init_peripherals();  // Initialiser les périphériques
 
-		int counter = 10;
+    int loop_count = 0;
+    bool infinite_loop = true;
+
+    if (argc > 1) {
+        loop_count = atoi(argv[1]); // Convertir l'argument en entier
+        if (loop_count < 0) {
+            printf("Invalid argument. Usage: %s <loop count>.\n", argv[0]);
+            return 1;
+        } else {
+            infinite_loop = (loop_count == 0);
+        }
+    }
 	
-    while (counter>0) {
+    while (infinite_loop || loop_count>0) {
         task_scheduler();
         sleep_ms(1000);
-				counter--;
+				loop_count--;
     }
 }

@@ -1,27 +1,21 @@
 #!/bin/bash
 
-# Project name
-IMAGE_BASE_NAME="optimizedscheduler"
-
-# Output folder after compilation
-OUTPUT_DIR="bin"
-
 # Iteration number
 ITERATIONS=7
 
-# Work folder where Iteration folders are.
-CODE_DIR="."
-OUTPUT_DIR="${CODE_DIR}/${OUTPUT_DIR}"
-
-# TDP fixe du processeur
+# TDP of Processor in use (depending of host hardware)
 TDP=95
+NUM_CORE=16
+TDP_PER_CORE=$(($TDP / $NUM_CORE))
 
-# Fonction pour lire les statistiques CPU depuis /proc/stat
+CPU_CORE=0
+
+# Read CPU stats of CORE 0 from /proc/stat
 read_cpu_stats() {
-    awk '/^cpu / {print $2, $3, $4, $5, $6, $7, $8}' /proc/stat
+    awk '/^cpu0 / {print $2, $3, $4, $5, $6, $7, $8}' /proc/stat
 }
 
-# Fonction pour calculer la différence entre deux séries de valeurs CPU
+# Calculate CPU Usage between snapshot of /proc/stat
 calculate_cpu_usage() {
     local -n start=$1
     local -n end=$2
@@ -40,40 +34,80 @@ calculate_cpu_usage() {
     echo "$active_diff $total_diff"
 }
 
-# Boucle sur chaque itération
+# Loop of X Iterations configured
 for i in $(seq 0 $ITERATIONS); do
     ITERATION_DIR="Iteration_${i}"
-    APP_NAME="${IMAGE_BASE_NAME}${i}"
-    APP="${OUTPUT_DIR}/${APP_NAME}"
+    APP_NAME="optimizedscheduler${i}"
+    APP="bin/${APP_NAME}"
+    LOG_FILE="output/${APP_NAME}_localrun_$(date +"%Y%m%d_%H%M%S").log"
+    WRAPPER_SCRIPT="bin/wrapper_${APP_NAME}.sh"
 
-    # Compiler le code du main.c du dossier courant
+    echo "Starting the Local Analysis of '${ITERATION_DIR}' on CPU Core ${CPU_CORE} ...\n"    
+    echo "Total TDP: ${TDP} W" >> "${LOG_FILE}"
+    echo "Number of Cores: ${NUM_CORE}" >> "${LOG_FILE}"
+    echo "TDP per Core: ${TDP_PER_CORE} W" >> "${LOG_FILE}"
+    echo "Using CPU Core: ${CPU_CORE}" >> "${LOG_FILE}"
+
+    # Check present of Iteration Folder.
+    if [ ! -d "${ITERATION_DIR}" ]; then
+        echo "Error: Directory '${ITERATION_DIR}' does not exist. Skipping iteration ${i}."
+        continue
+    fi
+
+    # Compile all c files found, and manage error.
     gcc -w -o "${APP}" "${ITERATION_DIR}"/*.c
+    if [ $? -ne 0 ]; then
+        echo "Error: Compilation failed for iteration ${i}. Skipping." | tee -a "${LOG_FILE}"
+        continue
+    fi
 
-    # Changer de répertoire vers le dossier OUTPUT_DIR
-    cd "${OUTPUT_DIR}"
-
-    # Lire les statistiques CPU avant l'exécution
+    # Take a snapshot of CPU stats and timing before execution of program
     read -a cpu_start < <(read_cpu_stats)
+    start_time=$(date +"%Y-%m-%d %H:%M:%S")
+    start_timestamp=$(date +%s) # Timestamp en secondes
+    echo "Start Time: ${start_time}" >> "${LOG_FILE}"
 
-    # Exécuter l'application et surveiller avec valgrind
-    valgrind --tool=callgrind "${APP_NAME}"
+    # Execute the APP, only with the Core CPU_CORE to measure the Usage of one CPU Core and estimate the consumption.
+    taskset -c ${CPU_CORE} "${APP}" 5 &>> "${LOG_FILE}"
+    if [ $? -ne 0 ]; then
+        echo "Error: Valgrind execution failed for iteration ${i}. Check ${LOG_FILE} for details."
+        echo "${?}" &>> "${LOG_FILE}"
+        continue
+    fi
 
-    # Lire les statistiques CPU après l'exécution
+    # Take a snapshot of CPU stats and timing after execution of program
     read -a cpu_end < <(read_cpu_stats)
+    end_time=$(date +"%Y-%m-%d %H:%M:%S")
+    end_timestamp=$(date +%s) # Timestamp en secondes
+    echo "End Time: ${end_time}" >> "${LOG_FILE}"
+    
+    # Calculer le temps d'exécution
+    elapsed_time=$((end_timestamp - start_timestamp))
+    echo "Execution Time: ${elapsed_time} seconds" >> "${LOG_FILE}"
 
-    # Calculer l'utilisation du CPU
+    # Calculate Usage CPU
     read active_diff total_diff < <(calculate_cpu_usage cpu_start cpu_end)
 
-    # Calculer l'utilisation Adu CPU en pourcentage
+    # Calculate CPU Core in Pourcentage
     cpu_usage_percentage=$(awk "BEGIN {print ($active_diff / $total_diff) * 100}")
 
-    # Calculer la puissance consommée en watts
-    power_consumed=$(awk "BEGIN {print ($TDP * $cpu_usage_percentage) / 100}")
+    # estimate the consumption of CPU Core dedicated in Watts
+    power_consumed=$(awk "BEGIN {print ($TDP_PER_CORE * $cpu_usage_percentage) / 100}")
 
     echo "Iteration $i : CPU Usage = ${cpu_usage_percentage}% | Consummed Watts = ${power_consumed} W"
+    echo "CPU CORE ${CPU_CORE} Usage: ${cpu_usage_percentage}%" >> "${LOG_FILE}"
+    echo "Power Consumed: ${power_consumed} W" >> "${LOG_FILE}"
+
+    # Execute Valgrind memory leak analysis on the APP.
+    valgrind --tool=memcheck --leak-check=full "${APP}" 5 &>> "${LOG_FILE}"
+    if [ $? -ne 0 ]; then
+        echo "Error: Valgrind execution failed for iteration ${i}. Check ${LOG_FILE} for details."
+        echo "${?}" &>> "${LOG_FILE}"
+        continue
+    fi
 
     # Revenir au répertoire précédent
-    cd ".."
+    echo "...Ending the Local Analysis of Iteration ${i}."
 done
 
-echo "All Iteration"
+echo "All Iteration completed."

@@ -32,6 +32,14 @@ TinyMLModel ml_model;
 
 // Variable globale pour stocker les paramètres de l'objectif
 GoalParameters global_goal_params;
+uint8_t global_taskcounter = 0;
+
+// Increment Task Counter and show the task name.
+void incrementTaskCounter(const char *taskName) {
+    global_taskcounter++;
+    printf("%d tasks executed so far. Last task: %s\n", global_taskcounter, taskName);
+}
+
 
 
 
@@ -66,6 +74,7 @@ void runTempTask() {
     temperature_values[measure_index] = read_temperature();
     measure_index = (measure_index + 1) % NUM_MEASURES;
     if (measure_index == 0) buffer_full = true;
+    incrementTaskCounter("runTempTask");
 }
 
 // Task - Compute the average of the Temperature collected
@@ -73,6 +82,7 @@ void computeAvgTempTask() {
     if (buffer_full) {  // Calcul seulement quand le buffer est plein
         float average_temp = average();
         printf("Average of collected temperatures: %.2f C\n", average_temp);
+        incrementTaskCounter("computeAvgTempTask");
     }
 }
 
@@ -82,6 +92,7 @@ void sendResultTask() {
         blink_led(NUM_MEASURES);
         buffer_full = false;
         measure_index = 0;
+        incrementTaskCounter("sendResultTask");
     }
 }
 
@@ -101,7 +112,7 @@ uint8_t get_current_hour() {
 
 
 
-int main() {
+int main(int argc, char *argv[]) {
 	
     // Load the TinyML model
     // if (!load_tinyml_model(&ml_model, model_data, sizeof(model_data), tensor_arena, sizeof(tensor_arena))) {
@@ -120,6 +131,21 @@ int main() {
     init_peripherals();
     TaskQueue* queue = init_task_queue(MAX_TASKS);
 
+    int loop_count = 0;
+    bool infinite_loop = true;
+
+    if (argc > 1) {
+        loop_count = atoi(argv[1]); // Convertir l'argument en entier
+        if (loop_count < 0) {
+            printf("Invalid argument. Usage: %s <loop count>.\n", argv[0]);
+            return 1;
+        } else {
+            infinite_loop = (loop_count == 0);
+        }
+    }
+    int duration_days = loop_count;
+    
+
     // Initialisation des tâches
     Task runTempTaskStruct = { runTempTask, 5000, 2, 3, false, 0.0, NULL, 0 };
     Task computeAvgTempTaskStruct = { computeAvgTempTask, 5000, 1, 2, true, 0.0, NULL, 0 };
@@ -131,10 +157,10 @@ int main() {
 
     // Initialisation de la source d'énergie et des paramètres
     EnergySource energy_source = { WIND, 6, 3, 3, {0}, 0.0 };
-    GoalParameters goal_params = { MAXIMIZE_RESILIENCE, 5 };
+    GoalParameters goal_params = { MAXIMIZE_RESILIENCE, duration_days };
 
     // Simulation principale
-    while (simulated_day < goal_params.duration_days) {
+    while (infinite_loop || simulated_day < goal_params.duration_days) {
         if (is_energy_available(&energy_source)) {
             update_energy_profile(&energy_source);
             execute_tasks(queue, &energy_source, &goal_params);
