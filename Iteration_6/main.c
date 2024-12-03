@@ -189,11 +189,34 @@ uint8_t get_current_hour() {
     return simulated_hour;
 }
 
+
+// Fonction pour mettre à jour le profil d'intermittence et calculer la prévisibilité
+void update_energy_profile(EnergySource *source) {
+    uint8_t available_hours_today = source->duration_hours * source->occurrences_per_day;
+    for (int i = HISTORY_DAYS - 1; i > 0; i--) {
+        source->availability_history[i] = source->availability_history[i - 1];
+    }
+    source->availability_history[0] = available_hours_today;
+
+    // Calcul de la prévisibilité en utilisant l'historique
+    float total = 0;
+    float variance = 0;
+    for (int i = 0; i < HISTORY_DAYS; i++) {
+        total += source->availability_history[i];
+    }
+    float mean = total / HISTORY_DAYS;
+    for (int i = 0; i < HISTORY_DAYS; i++) {
+        variance += (source->availability_history[i] - mean) * (source->availability_history[i] - mean);
+    }
+    source->predictability = 1.0f / (1.0f + (variance / HISTORY_DAYS));
+}
+
 // Fonction pour forcer l'update de l'heure simulée
-void update_simulated_hour() {
+void update_simulated_hour(EnergySource *source) {
     simulated_hour = (simulated_hour + 1) % 24;
     if (simulated_hour == 0) {
         simulated_day++;
+        update_energy_profile(source);
     }
 }
 
@@ -219,27 +242,6 @@ bool is_energy_available(EnergySource *source) {
     return false;
 }
 
-// Fonction pour mettre à jour le profil d'intermittence et calculer la prévisibilité
-void update_energy_profile(EnergySource *source) {
-    uint8_t available_hours_today = source->duration_hours * source->occurrences_per_day;
-    for (int i = HISTORY_DAYS - 1; i > 0; i--) {
-        source->availability_history[i] = source->availability_history[i - 1];
-    }
-    source->availability_history[0] = available_hours_today;
-
-    // Calcul de la prévisibilité en utilisant l'historique
-    float total = 0;
-    float variance = 0;
-    for (int i = 0; i < HISTORY_DAYS; i++) {
-        total += source->availability_history[i];
-    }
-    float mean = total / HISTORY_DAYS;
-    for (int i = 0; i < HISTORY_DAYS; i++) {
-        variance += (source->availability_history[i] - mean) * (source->availability_history[i] - mean);
-    }
-    source->predictability = 1.0f / (1.0f + (variance / HISTORY_DAYS));
-}
-
 // Fonction pour calculer la métrique heuristique de chaque tâche
 void calculate_heuristic_metric(Task *task, GoalParameters *goal_params) {
     if (goal_params->goal == MAXIMIZE_TASKS) {
@@ -248,53 +250,6 @@ void calculate_heuristic_metric(Task *task, GoalParameters *goal_params) {
         task->heuristic_metric = task->priority * 0.3 + task->weight * 0.2 + (task->critical ? 1.0 : 0.0) * 0.5;
     }
 }
-
-// Fonction pour trier les tâches en fonction de la métrique heuristique
-int compare_tasks(const void* a, const void* b) {
-    Task* taskA = *(Task**)a;
-    Task* taskB = *(Task**)b;
-    if (taskA->heuristic_metric > taskB->heuristic_metric) return -1;
-    if (taskA->heuristic_metric < taskB->heuristic_metric) return 1;
-    return 0;
-}
-
-// Fonction pour exécuter les tâches en fonction de l'objectif sélectionné
-void execute_tasks(Task* tasks, uint8_t task_count, EnergySource *source, GoalParameters *goal_params) {
-    update_energy_profile(source);
-
-    if (!is_energy_available(source)) {
-        printf("Energy source is not available. Tasks are paused.\n");
-        return;
-    }
-
-    // Calculer la métrique heuristique pour chaque tâche
-    for (int i = 0; i < task_count; i++) {
-        calculate_heuristic_metric(&tasks[i], goal_params);
-    }
-
-    // Tri des tâches en fonction de la métrique heuristique
-    qsort(tasks, task_count, sizeof(Task*), compare_tasks);
-
-    for (uint8_t i = 0; i < task_count; i++) {
-        Task* task = &tasks[i];
-
-        bool ready_to_run = true;
-        for (uint8_t j = 0; j < task->num_dependencies; j++) {
-            Task* dependency = task->dependencies[j];
-            if (dependency) {
-                ready_to_run = false;
-                break;
-            }
-        }
-
-        if (ready_to_run) {
-            task->taskFunction();
-            sleep_ms(task->delay_ms);
-        }
-    }
-}
-
-// restent identiques.
 
 int main(int argc, char *argv[]) {
     init_peripherals();
@@ -338,7 +293,7 @@ int main(int argc, char *argv[]) {
             deep_sleep(5000);  // Durée de sommeil profond (ajustable selon les besoins)
         }
 
-        update_simulated_hour();
+        update_simulated_hour(&energy_source);
         sleep_ms(1000);  // Simulation d'un intervalle de contrôle
     }
 
