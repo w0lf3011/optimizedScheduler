@@ -20,6 +20,6 @@ typedef struct {
 } EnergySource;
 
 void update_energy_profile(EnergySource *source);
-bool is_energy_available(EnergySource *source);
+bool is_energy_available(EnergySource *source, uint8_t hours);
 
 #endif

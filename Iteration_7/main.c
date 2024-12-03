@@ -10,7 +10,6 @@
 
 #define NUM_MEASURES 10
 
-
 /////////////////////
 /// Global variables
 /////////////////////
@@ -19,7 +18,7 @@
 float temperature_values[NUM_MEASURES];
 uint8_t measure_index = 0;
 bool buffer_full = false;
-uint8_t simulated_hour = 0;   // Heure simulée pour la source d'énergie
+uint8_t simulated_hour = 5;   // Heure simulée pour la source d'énergie
 uint8_t simulated_day = 0;    // Jour simulé pour la durée de simulation
 
 // Variable globale pour stocker les paramètres de l'objectif
@@ -111,36 +110,29 @@ int main(int argc, char *argv[]) {
     init_peripherals();
     TaskQueue* queue = init_task_queue(MAX_TASKS);
     
-    int loop_count = 0;
-    bool infinite_loop = true;
-
-    if (argc > 1) {
-        loop_count = atoi(argv[1]); // Convertir l'argument en entier
-        if (loop_count < 0) {
-            printf("Invalid argument. Usage: %s <loop count>.\n", argv[0]);
-            return 1;
-        } else {
-            infinite_loop = (loop_count == 0);
-        }
-    }
-    int duration_days = loop_count;
+    int duration_days = (argc > 1) ? atoi(argv[1]) : 0;
+    bool infinite_loop = (duration_days == 0);
 
     // Initialisation des tâches
-    Task runTempTaskStruct = { runTempTask, 5000, 2, 3, false, 0.0, NULL, 0 };
-    Task computeAvgTempTaskStruct = { computeAvgTempTask, 5000, 1, 2, true, 0.0, NULL, 0 };
-    Task sendResultTaskStruct = { sendResultTask, 1000, 3, 1, true, 0.0, NULL, 0 };
+    static Task runTempTaskStruct = { runTempTask, 5000, 2, 3, false, 0.0, NULL, 0 };
+    static Task computeAvgTempTaskStruct = { computeAvgTempTask, 5000, 1, 2, true, 0.0, NULL, 0 };
+    static Task sendResultTaskStruct = { sendResultTask, 1000, 3, 1, true, 0.0, NULL, 0 };
 
-    // Initialisation des dépendances
-    sendResultTaskStruct.dependencies = &computeAvgTempTaskStruct;
+    static Task* dependencies[] = { &computeAvgTempTaskStruct };
+    sendResultTaskStruct.dependencies = dependencies;
     sendResultTaskStruct.num_dependencies = 1;
 
+    enqueue_task(queue, &runTempTaskStruct);
+    enqueue_task(queue, &computeAvgTempTaskStruct);
+    enqueue_task(queue, &sendResultTaskStruct);
+
     // Initialisation de la source d'énergie et des paramètres
-    EnergySource energy_source = { WIND, 6, 3, 3, {0}, 0.0 };
+    EnergySource energy_source = { SOLAR, 6, 12, 1, {0}, 0.0 };
     GoalParameters goal_params = { MAXIMIZE_RESILIENCE, duration_days };
 
     // Simulation principale
     while (infinite_loop || simulated_day < goal_params.duration_days) {
-        if (is_energy_available(&energy_source)) {
+        if (is_energy_available(&energy_source, get_current_hour())) {
             update_energy_profile(&energy_source);
             execute_tasks(queue, &energy_source, &goal_params);
         } else {

@@ -25,9 +25,8 @@ void update_energy_profile(EnergySource *source) {
     source->predictability = 1.0f / (1.0f + (variance / HISTORY_DAYS));
 }
 
-bool is_energy_available(EnergySource *source) {
+bool is_energy_available(EnergySource *source, uint8_t hours) {
     // Logic to check availability based on the current simulated hour and the profile
-    uint8_t current_hour = get_current_hour();
     uint8_t interval_hours = 24 / source->occurrences_per_day;
     
     for (uint8_t i = 0; i < source->occurrences_per_day; i++) {
@@ -35,11 +34,11 @@ bool is_energy_available(EnergySource *source) {
         uint8_t end_time = (start_time + source->duration_hours) % 24;
 
         if (start_time < end_time) {
-            if (current_hour >= start_time && current_hour < end_time) {
+            if (hours >= start_time && hours < end_time) {
                 return true;
             }
         } else {
-            if (current_hour >= start_time || current_hour < end_time) {
+            if (hours >= start_time || hours < end_time) {
                 return true;
             }
         }

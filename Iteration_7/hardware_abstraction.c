@@ -6,6 +6,11 @@ void init_peripherals() {
     printf("Initializing peripherals (simulated for Linux)...\n");
 }
 
+// Fonction pour simuler un sleep
+void sleep_ms(uint32_t ms) {
+    usleep(ms * 1000);  // Convertit ms en µs
+}
+
 void delay(uint32_t ms) {
     sleep_ms(ms);
 }
@@ -26,7 +31,3 @@ void blink_led(uint8_t times) {
     }
 }
 
-// Fonction pour simuler un sleep
-void sleep_ms(uint32_t ms) {
-    usleep(ms * 1000);  // Convertit ms en µs
-}
