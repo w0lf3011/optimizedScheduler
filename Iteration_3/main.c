@@ -38,7 +38,7 @@ typedef struct Task {
 float temperature_values[NUM_MEASURES];
 uint8_t measure_index = 0;
 bool buffer_full = false; // Indique si le buffer circulaire est plein
-uint8_t simulated_hour = 6;
+uint8_t simulated_hour = 5;
 uint8_t global_taskcounter = 0;
 
 // Increment Task Counter and show the task name.

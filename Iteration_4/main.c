@@ -51,7 +51,7 @@ typedef struct Task {
 float temperature_values[NUM_MEASURES];
 uint8_t measure_index = 0;
 bool buffer_full = false;
-uint8_t simulated_hour = 0;   // Heure simulée pour la source d'énergie
+uint8_t simulated_hour = 5;   // Heure simulée pour la source d'énergie
 uint8_t simulated_day = 0;    // Jour simulé pour la durée de simulation
 
 // Variable globale pour stocker les paramètres de l'objectif
@@ -172,8 +172,8 @@ bool is_energy_available(EnergySource *source) {
 
 // Fonction pour trier les tâches en fonction de l'objectif et des propriétés de chaque tâche
 int compare_tasks(const void* a, const void* b) {
-    Task* taskA = (Task*)a;
-    Task* taskB = (Task*)b;
+    Task* taskA = *(Task**)a;
+    Task* taskB = *(Task**)b;
 
     if (global_goal_params.goal == MAXIMIZE_RESILIENCE) {
         // Prioriser les tâches critiques pour la résilience
@@ -190,7 +190,7 @@ int compare_tasks(const void* a, const void* b) {
 }
 
 // Fonction pour exécuter les tâches en fonction de l'objectif sélectionné
-void execute_tasks(Task* tasks, uint8_t task_count, EnergySource *source, GoalParameters *goal_params) {
+void execute_tasks(Task* tasks[], uint8_t task_count, EnergySource *source, GoalParameters *goal_params) {
     global_goal_params = *goal_params;  // Stocker les paramètres de l'objectif dans la variable globale
 
     if (!is_energy_available(source)) {
@@ -199,15 +199,20 @@ void execute_tasks(Task* tasks, uint8_t task_count, EnergySource *source, GoalPa
     }
 
     // Tri des tâches en fonction de l'objectif
-    qsort(tasks, task_count, sizeof(Task), compare_tasks);
+    qsort(tasks, task_count, sizeof(Task*), compare_tasks);
+
+    bool task_completed[task_count];
+    for (uint8_t i = 0; i < task_count; i++) {
+        task_completed[i] = false;
+    }
 
     for (uint8_t i = 0; i < task_count; i++) {
-        Task* task = &tasks[i];
-
+        Task* task = tasks[i];
         bool ready_to_run = true;
+
+        // Check Dependencies
         for (uint8_t j = 0; j < task->num_dependencies; j++) {
-            Task* dependency = task->dependencies[j];
-            if (dependency) {
+            if (!task_completed[j]) {
                 ready_to_run = false;
                 break;
             }
@@ -215,6 +220,7 @@ void execute_tasks(Task* tasks, uint8_t task_count, EnergySource *source, GoalPa
 
         if (ready_to_run) {
             task->taskFunction();
+            task_completed[i] = true;
             sleep_ms(task->delay_ms);
         }
     }
@@ -223,32 +229,23 @@ void execute_tasks(Task* tasks, uint8_t task_count, EnergySource *source, GoalPa
 int main(int argc, char *argv[]) {
     init_peripherals();
 
-    int loop_count = 0;
-    bool infinite_loop = true;
+    int duration_days = (argc > 1) ? atoi(argv[1]) : 0;
+    bool infinite_loop = (duration_days == 0);
 
-    if (argc > 1) {
-        loop_count = atoi(argv[1]); // Convertir l'argument en entier
-        if (loop_count < 0) {
-            printf("Invalid argument. Usage: %s <loop count>.\n", argv[0]);
-            return 1;
-        } else {
-            infinite_loop = (loop_count == 0);
-        }
-    }
-    int duration_days = loop_count;
-	
+    // Création des tâches avec leurs fonctions, délais, priorités et poids
+    static Task runTempTaskStruct = { runTempTask, 5000, 3, 1, NULL, 0 };
+    static Task computeAvgTempTaskStruct = { computeAvgTempTask, 5000, 2, 2, NULL, 0 };
+    static Task sendResultTaskStruct = { sendResultTask, 1000, 1, 3, NULL, 0 };
+    
+    static Task* dependencies[] = { &computeAvgTempTaskStruct };
+    sendResultTaskStruct.dependencies = dependencies;
+    sendResultTaskStruct.num_dependencies = 1;
 
-    Task runTempTaskStruct = { runTempTask, 5000, 2, 3, false, NULL, 0 };
-    Task computeAvgTempTaskStruct = { computeAvgTempTask, 5000, 1, 2, true, NULL, 0 };
-    Task sendResultTaskStruct = { sendResultTask, 1000, 3, 1, true, NULL, 0 };
-
+    // Initialisation des dépendances
     Task* tasks[] = { &runTempTaskStruct, &computeAvgTempTaskStruct, &sendResultTaskStruct };
     uint8_t task_count = sizeof(tasks) / sizeof(tasks[0]);
 
-    sendResultTaskStruct.dependencies = &computeAvgTempTaskStruct;
-    sendResultTaskStruct.num_dependencies = 1;
-
-    EnergySource energy_source = { WIND, 6, 3, 3 };
+    EnergySource energy_source = { SOLAR, 6, 12, 1 };
 
     GoalParameters goal_params = { MAXIMIZE_RESILIENCE, duration_days }; // Objectif de résilience pour 5 jours
 
