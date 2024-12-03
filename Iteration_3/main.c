@@ -38,7 +38,7 @@ typedef struct Task {
 float temperature_values[NUM_MEASURES];
 uint8_t measure_index = 0;
 bool buffer_full = false; // Indique si le buffer circulaire est plein
-uint8_t simulated_hour = 0;
+uint8_t simulated_hour = 6;
 uint8_t global_taskcounter = 0;
 
 // Increment Task Counter and show the task name.
@@ -51,6 +51,7 @@ void incrementTaskCounter(const char *taskName) {
 // Initialisation des périphériques
 void init_peripherals() {
     printf("Initializing peripherals (simulated for Linux)...\n");
+    fflush(stdout);
 }
 
 // Fonction pour lire la température
@@ -136,7 +137,7 @@ void update_simulated_hour() {
 // Fonction pour vérifier la disponibilité de la source d'énergie
 bool is_energy_available(EnergySource *source) {
     uint8_t current_hour = get_current_hour();
-    
+    printf("check energy availability: %d\n", current_hour);
     // Calculer l'intervalle entre chaque occurrence
     uint8_t interval_hours = 24 / source->occurrences_per_day;
     
@@ -160,8 +161,8 @@ bool is_energy_available(EnergySource *source) {
 
 // Fonction pour trier les tâches en fonction du poids et de la priorité
 int compare_tasks(const void* a, const void* b) {
-    Task* taskA = (Task*)a;
-    Task* taskB = (Task*)b;
+    Task* taskA = *(Task**)a;
+    Task* taskB = *(Task**)b;
     // Tâches avec une priorité plus élevée ou un poids inférieur sont préférées
     if (taskA->priority != taskB->priority) {
         return taskB->priority - taskA->priority;
@@ -170,34 +171,37 @@ int compare_tasks(const void* a, const void* b) {
 }
 
 // Fonction pour exécuter les tâches en fonction de la disponibilité énergétique
-void execute_tasks(Task* tasks, uint8_t task_count, EnergySource *source) {
-    // Si l'énergie n'est pas disponible, mettre en pause l'exécution des tâches
+void execute_tasks(Task* tasks[], uint8_t task_count, EnergySource *source) {
+    
     if (!is_energy_available(source)) {
         printf("Energy source is not available. Tasks are paused.\n");
         return;
     }
 
     // Tri des tâches par priorité et poids
-    qsort(tasks, task_count, sizeof(Task), compare_tasks);
+    qsort(tasks, task_count, sizeof(Task*), compare_tasks);
 
-    // Exécuter les tâches en tenant compte des dépendances
+    bool task_completed[task_count];
     for (uint8_t i = 0; i < task_count; i++) {
-        Task* task = &tasks[i];
-        
-        // Vérifier que toutes les dépendances sont terminées
+        task_completed[i] = false;
+    }
+
+    for (uint8_t i = 0; i < task_count; i++) {
+        Task* task = tasks[i];
         bool ready_to_run = true;
+
+        // Check Dependencies
         for (uint8_t j = 0; j < task->num_dependencies; j++) {
-            Task* dependency = task->dependencies[j];
-            if (dependency) {
+            if (!task_completed[j]) {
                 ready_to_run = false;
                 break;
             }
         }
-        
-        // Exécuter la tâche si elle est prête
+
         if (ready_to_run) {
             task->taskFunction();
-            sleep_ms(task->delay_ms); // Temps de repos après exécution
+            task_completed[i] = true;
+            sleep_ms(task->delay_ms);
         }
     }
 }
@@ -205,37 +209,29 @@ void execute_tasks(Task* tasks, uint8_t task_count, EnergySource *source) {
 int main(int argc, char *argv[]) {
     init_peripherals();
 
-    int loop_count = 0;
-    bool infinite_loop = true;
-
-    if (argc > 1) {
-        loop_count = atoi(argv[1]); // Convertir l'argument en entier
-        if (loop_count < 0) {
-            printf("Invalid argument. Usage: %s <loop count>.\n", argv[0]);
-            return 1;
-        } else {
-            infinite_loop = (loop_count == 0);
-        }
-    }
+    int loop_count = (argc > 1) ? atoi(argv[1]) : 0;
+    bool infinite_loop = (loop_count == 0);
 
     // Création des tâches avec leurs fonctions, délais, priorités et poids
-    Task runTempTaskStruct = { runTempTask, 5000, 2, 3, NULL, 0 };
-    Task computeAvgTempTaskStruct = { computeAvgTempTask, 5000, 1, 2, NULL, 0 };
-    Task sendResultTaskStruct = { sendResultTask, 1000, 3, 1, NULL, 0 };
+    static Task runTempTaskStruct = { runTempTask, 5000, 3, 1, NULL, 0 };
+    static Task computeAvgTempTaskStruct = { computeAvgTempTask, 5000, 2, 2, NULL, 0 };
+    static Task sendResultTaskStruct = { sendResultTask, 1000, 1, 3, NULL, 0 };
+    
+    static Task* dependencies[] = { &computeAvgTempTaskStruct };
+    sendResultTaskStruct.dependencies = dependencies;
+    sendResultTaskStruct.num_dependencies = 1;
 
     // Initialisation des dépendances
     Task* tasks[] = { &runTempTaskStruct, &computeAvgTempTaskStruct, &sendResultTaskStruct };
     uint8_t task_count = sizeof(tasks) / sizeof(tasks[0]);
 
-    // Ajouter des dépendances
-    sendResultTaskStruct.dependencies = &computeAvgTempTaskStruct;
-    sendResultTaskStruct.num_dependencies = 1;
-
     // Configuration de la nature de la source d'energie
     // Exemple : source éolienne, active 3 fois par jour, pour 3 heures chaque fois, à partir de 6h.
-    EnergySource energy_source = { WIND, 6, 3, 3 };
+    EnergySource energy_source = { SOLAR, 6, 12, 1 };
 
     while (infinite_loop || loop_count>0) {
+        printf("Loop %d, Hour: %d\n", loop_count, get_current_hour());
+        fflush(stdout);
         execute_tasks(tasks, task_count, &energy_source);
         sleep_ms(1000);
         loop_count--;
