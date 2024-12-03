@@ -2,6 +2,7 @@
 
 # Iteration number
 ITERATIONS=7
+REPETITIONS=5
 
 # TDP of Processor in use (depending of host hardware)
 TDP=95
@@ -34,10 +35,14 @@ calculate_cpu_usage() {
     echo "$active_diff $total_diff"
 }
 
+RESULT_JSON="{"
+RESULT_LATEX="\\begin{tabular}{|c|c|c|c|c|c|c|c|}\n\\hline\nIteration & Run & Execution Time (s) & CPU Usage (%) & Power Consumed (W) & Valgrind Errors & Valgrind Allocs & Valgrind Frees & Bytes Allocated \\\\\n\\hline\n"
+
+
 # Loop of X Iterations configured
-for i in $(seq 0 $ITERATIONS); do
-    ITERATION_DIR="Iteration_${i}"
-    APP_NAME="optimizedscheduler${i}"
+for iteration in $(seq 0 $ITERATIONS); do
+    ITERATION_DIR="Iteration_${iteration}"
+    APP_NAME="optimizedscheduler${iteration}"
     APP="bin/${APP_NAME}"
     LOG_FILE="output/${APP_NAME}_localrun_$(date +"%Y%m%d_%H%M%S").log"
     WRAPPER_SCRIPT="bin/wrapper_${APP_NAME}.sh"
@@ -50,7 +55,7 @@ for i in $(seq 0 $ITERATIONS); do
 
     # Check present of Iteration Folder.
     if [ ! -d "${ITERATION_DIR}" ]; then
-        echo "Error: Directory '${ITERATION_DIR}' does not exist. Skipping iteration ${i}."
+        echo "Error: Directory '${ITERATION_DIR}' does not exist. Skipping iteration ${iteration}."
         continue
     fi
 
@@ -61,53 +66,99 @@ for i in $(seq 0 $ITERATIONS); do
         continue
     fi
 
-    # Take a snapshot of CPU stats and timing before execution of program
-    read -a cpu_start < <(read_cpu_stats)
-    start_time=$(date +"%Y-%m-%d %H:%M:%S")
-    start_timestamp=$(date +%s) # Timestamp en secondes
-    echo "Start Time: ${start_time}" >> "${LOG_FILE}"
+    ITERATION_RESULTS="{\"iteration\": $iteration, \"runs\": ["
+    TOTAL_TIME=0
+    TOTAL_CPU=0
+    TOTAL_POWER=0
+    TOTAL_ERRORS=0
+    TOTAL_ALLOCS=0
+    TOTAL_FREES=0
+    TOTAL_BYTES=0
 
-    # Execute the APP, only with the Core CPU_CORE to measure the Usage of one CPU Core and estimate the consumption.
-    taskset -c ${CPU_CORE} "${APP}" 5 &>> "${LOG_FILE}"
-    if [ $? -ne 0 ]; then
-        echo "Error: execution failed for iteration ${i}. Check ${LOG_FILE} for details."
-        echo "${?}" &>> "${LOG_FILE}"
-        continue
-    fi
+    # Run for X Repetition and collect metrics into a JSON and Tex files.
+    for run in $(seq 1 $REPETITIONS); do
+        echo "Iteration $iteration - Run ${run}..."
 
-    # Take a snapshot of CPU stats and timing after execution of program
-    read -a cpu_end < <(read_cpu_stats)
-    end_time=$(date +"%Y-%m-%d %H:%M:%S")
-    end_timestamp=$(date +%s) # Timestamp en secondes
-    echo "End Time: ${end_time}" >> "${LOG_FILE}"
-    
-    # Calculer le temps d'exécution
-    elapsed_time=$((end_timestamp - start_timestamp))
-    echo "Execution Time: ${elapsed_time} seconds" >> "${LOG_FILE}"
+        # Take a snapshot of CPU stats and timing before execution of program
+        read -a cpu_start < <(read_cpu_stats)
+        start_time=$(date +%s)
+        echo "Start Time: ${start_time}" >> "${LOG_FILE}"
 
-    # Calculate Usage CPU
-    read active_diff total_diff < <(calculate_cpu_usage cpu_start cpu_end)
+        # Execute the APP, only with the Core CPU_CORE to measure the Usage of one CPU Core and estimate the consumption.
+        taskset -c ${CPU_CORE} "${APP}" 5 &>> "${LOG_FILE}"
+        if [ $? -ne 0 ]; then
+            echo "Error: execution failed for iteration ${iteration}. Check ${LOG_FILE} for details."
+            continue
+        fi
 
-    # Calculate CPU Core in Pourcentage
-    cpu_usage_percentage=$(awk "BEGIN {print ($active_diff / $total_diff) * 100}")
+        # Take a snapshot of CPU stats and timing after execution of program
+        read -a cpu_end < <(read_cpu_stats)
+        end_time=$(date +%s)
+        echo "End Time: ${end_time}" >> "${LOG_FILE}"
+        
+        # Calculer le temps d'exécution
+        elapsed_time=$((end_time - start_time))
+        echo "Execution Time: ${elapsed_time} seconds" >> "${LOG_FILE}"
 
-    # estimate the consumption of CPU Core dedicated in Watts
-    power_consumed=$(awk "BEGIN {print ($TDP_PER_CORE * $cpu_usage_percentage) / 100}")
+        # Calculate Usage CPU
+        read active_diff total_diff < <(calculate_cpu_usage cpu_start cpu_end)
+        cpu_usage_percentage=$(awk "BEGIN {print ($active_diff / $total_diff) * 100}")
+        power_consumed=$(awk "BEGIN {print ($TDP_PER_CORE * $cpu_usage_percentage) / 100}")
 
-    echo "Iteration $i : CPU Usage = ${cpu_usage_percentage}% | Consummed Watts = ${power_consumed} W"
-    echo "CPU CORE ${CPU_CORE} Usage: ${cpu_usage_percentage}%" >> "${LOG_FILE}"
-    echo "Power Consumed: ${power_consumed} W" >> "${LOG_FILE}"
+        echo "Iteration $iteration : CPU Usage = ${cpu_usage_percentage}% | Consummed Watts = ${power_consumed} W"
+        echo "Iteration $iteration : CPU Usage = ${cpu_usage_percentage}% | Consummed Watts = ${power_consumed} W" >> "${LOG_FILE}"
+        echo "Iteration $iteration - Run ${run} - CPU Usage = ${cpu_usage_percentage}% | Consummed Watts = ${power_consumed} W"
 
-    # Execute Valgrind memory leak analysis on the APP.
-    valgrind --tool=memcheck --leak-check=full "${APP}" 5 &>> "${LOG_FILE}"
-    if [ $? -ne 0 ]; then
-        echo "Error: Valgrind execution failed for iteration ${i}. Check ${LOG_FILE} for details."
-        echo "${?}" &>> "${LOG_FILE}"
-        continue
-    fi
+        # Analyse Valgrind
+        valgrind_output=$(valgrind --tool=memcheck --leak-check=full "${APP}" 5 2>&1)
+        #echo $valgrind_output
+        valgrind_errors=$(echo "$valgrind_output" | grep "ERROR SUMMARY" | awk '{print $4}')
+        #echo "Errors: ${valgrind_errors}"
+        valgrind_allocs=$(echo "$valgrind_output" | grep "total heap usage" | awk '{print $5}')
+        #echo "Allocs: ${valgrind_allocs}"
+        valgrind_frees=$(echo "$valgrind_output" | grep "total heap usage" | awk '{print $7}')
+        #echo "Frees: ${valgrind_frees}"
+        valgrind_bytes=$(echo "$valgrind_output" | grep "bytes allocated" | awk '{print $9}' | sed 's/,//g')
+        #echo "Bytes: ${valgrind_bytes}"
+
+        # Accumuler les résultats
+        TOTAL_TIME=$((TOTAL_TIME + elapsed_time))
+        TOTAL_CPU=$(awk "BEGIN {print $TOTAL_CPU + $cpu_usage_percentage}")
+        TOTAL_POWER=$(awk "BEGIN {print $TOTAL_POWER + $power_consumed}")
+        TOTAL_ERRORS=$((TOTAL_ERRORS + valgrind_errors))
+        TOTAL_ALLOCS=$((TOTAL_ALLOCS + valgrind_allocs))
+        TOTAL_FREES=$((TOTAL_FREES + valgrind_frees))
+        TOTAL_BYTES=$((TOTAL_BYTES + valgrind_bytes))
+
+        # Ajouter au JSON
+        ITERATION_RESULTS+="{\"run\": $run, \"execution_time\": $elapsed_time, \"cpu_usage\": $cpu_usage_percentage, \"power_consumed\": $power_consumed, \"valgrind_errors\": $valgrind_errors, \"valgrind_allocs\": $valgrind_allocs, \"valgrind_frees\": $valgrind_frees, \"bytes_allocated\": $valgrind_bytes},"
+
+        # Ajouter au tableau Latex
+        RESULT_LATEX+="$iteration & $run & $elapsed_time & $cpu_usage_percentage & $power_consumed & $valgrind_errors & $valgrind_allocs & $valgrind_frees & $valgrind_bytes \\\\\n\\hline\n"
+    done
+
+    # Calcul des moyennes
+    AVG_TIME=$(awk "BEGIN {print $TOTAL_TIME / $REPETITIONS}")
+    AVG_CPU=$(awk "BEGIN {print $TOTAL_CPU / $REPETITIONS}")
+    AVG_POWER=$(awk "BEGIN {print $TOTAL_POWER / $REPETITIONS}")
+    AVG_ERRORS=$(awk "BEGIN {print $TOTAL_ERRORS / $REPETITIONS}")
+    AVG_ALLOCS=$(awk "BEGIN {print $TOTAL_ALLOCS / $REPETITIONS}")
+    AVG_FREES=$(awk "BEGIN {print $TOTAL_FREES / $REPETITIONS}")
+    AVG_BYTES=$(awk "BEGIN {print $TOTAL_BYTES / $REPETITIONS}")
+
+    ITERATION_RESULTS+="{\"average\": {\"execution_time\": $AVG_TIME, \"cpu_usage\": $AVG_CPU, \"power_consumed\": $AVG_POWER, \"valgrind_errors\": $AVG_ERRORS, \"valgrind_allocs\": $AVG_ALLOCS, \"valgrind_frees\": $AVG_FREES, \"bytes_allocated\": $AVG_BYTES}}]}"
+    RESULT_JSON+="$ITERATION_RESULTS,"
+
+    RESULT_LATEX+="\\textbf{Average} & & $AVG_TIME & $AVG_CPU & $AVG_POWER & $AVG_ERRORS & $AVG_ALLOCS & $AVG_FREES & $AVG_BYTES \\\\\n\\hline\n"
 
     # Revenir au répertoire précédent
-    echo "...Ending the Local Analysis of Iteration ${i}."
+    echo "...Ending the Local Analysis of Iteration ${iteration}."
 done
 
-echo "All Iteration completed."
+RESULT_JSON="${RESULT_JSON%,}}"
+RESULT_LATEX+="\\end{tabular}"
+
+echo "$RESULT_JSON" > "output/results_$(date +"%Y%m%d_%H%M").json"
+echo -e "$RESULT_LATEX" > "output/results_$(date +"%Y%m%d_%H%M").tex"
+
+echo "Results saved in results.json and results.tex."
