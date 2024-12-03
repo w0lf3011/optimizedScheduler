@@ -97,9 +97,9 @@ void blink_led(uint8_t times) {
     printf("Simulating blinking LED %d times...\n", times);
     for (uint8_t i = 0; i < times; i++) {
         printf("LED ON\n");
-        usleep(200000);  // 200 ms
+        usleep(2000);
         printf("LED OFF\n");
-        usleep(200000);
+        usleep(2000);
     }
 }
 
