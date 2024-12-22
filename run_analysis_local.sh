@@ -11,6 +11,10 @@ TDP_PER_CORE=$(($TDP / $NUM_CORE))
 
 CPU_CORE=0
 
+JSON_FILE="output/results_$(date +"%Y%m%d_%H%M").json"
+LATEX_FILE="output/results_$(date +"%Y%m%d_%H%M").tex"
+CSV_FILE="output/results_$(date +"%Y%m%d_%H%M").csv"
+
 # Read CPU stats of CORE 0 from /proc/stat
 read_cpu_stats() {
     awk '/^cpu0 / {print $2, $3, $4, $5, $6, $7, $8}' /proc/stat
@@ -35,8 +39,9 @@ calculate_cpu_usage() {
     echo "$active_diff $total_diff"
 }
 
-RESULT_JSON="{"
-RESULT_LATEX="\\begin{tabular}{|c|c|c|c|c|c|c|c|}\n\\hline\nIteration & Run & Execution Time (s) & CPU Usage (%) & Power Consumed (W) & Valgrind Errors & Valgrind Allocs & Valgrind Frees & Bytes Allocated \\\\\n\\hline\n"
+RESULT_JSON="["
+RESULT_LATEX="\\begin{tabular}{|c|c|c|c|c|c|c|c|c|}\n\\hline\nIteration & Run & Execution Time & CPU Usage & Power Consumed & Valgrind Errors & Valgrind Allocs & Valgrind Frees & Bytes Allocated \\\\\n\\hline\n"
+echo "Iteration;Run;Execution Time;CPU Usage;Power Consumed;Valgrind Errors;Valgrind Allocs;Valgrind Frees;Bytes Allocated" > "$CSV_FILE"
 
 
 # Loop of X Iterations configured
@@ -45,7 +50,7 @@ for iteration in $(seq 0 $ITERATIONS); do
     APP_NAME="optimizedscheduler${iteration}"
     APP="bin/${APP_NAME}"
     LOG_FILE="output/${APP_NAME}_localrun_$(date +"%Y%m%d_%H%M%S").log"
-    WRAPPER_SCRIPT="bin/wrapper_${APP_NAME}.sh"
+    
 
     echo "Starting the Local Analysis of '${ITERATION_DIR}' on CPU Core ${CPU_CORE} ...\n"    
     echo "Total TDP: ${TDP} W" >> "${LOG_FILE}"
@@ -67,6 +72,9 @@ for iteration in $(seq 0 $ITERATIONS); do
     fi
 
     ITERATION_RESULTS="{\"iteration\": $iteration, \"runs\": ["
+
+    # Variables to calculate averages
+    TOTAL_TASKS=0 # Keep it as default
     TOTAL_TIME=0
     TOTAL_CPU=0
     TOTAL_POWER=0
@@ -75,14 +83,14 @@ for iteration in $(seq 0 $ITERATIONS); do
     TOTAL_FREES=0
     TOTAL_BYTES=0
 
-    # Run for X Repetition and collect metrics into a JSON and Tex files.
+    # Run repetitions
     for run in $(seq 1 $REPETITIONS); do
-        echo "Iteration $iteration - Run ${run}..."
-
+        
         # Take a snapshot of CPU stats and timing before execution of program
         read -a cpu_start < <(read_cpu_stats)
         start_time=$(date +%s)
         echo "Start Time: ${start_time}" >> "${LOG_FILE}"
+        echo "Iteration $iteration - Run ${run} - ${start_time} ..."
 
         # Execute the APP, only with the Core CPU_CORE to measure the Usage of one CPU Core and estimate the consumption.
         taskset -c ${CPU_CORE} "${APP}" 5 &>> "${LOG_FILE}"
@@ -130,35 +138,33 @@ for iteration in $(seq 0 $ITERATIONS); do
         TOTAL_FREES=$((TOTAL_FREES + valgrind_frees))
         TOTAL_BYTES=$((TOTAL_BYTES + valgrind_bytes))
 
-        # Ajouter au JSON
+        # Append to JSON and CSV
         ITERATION_RESULTS+="{\"run\": $run, \"execution_time\": $elapsed_time, \"cpu_usage\": $cpu_usage_percentage, \"power_consumed\": $power_consumed, \"valgrind_errors\": $valgrind_errors, \"valgrind_allocs\": $valgrind_allocs, \"valgrind_frees\": $valgrind_frees, \"bytes_allocated\": $valgrind_bytes},"
-
-        # Ajouter au tableau Latex
-        RESULT_LATEX+="$iteration & $run & $elapsed_time & $cpu_usage_percentage & $power_consumed & $valgrind_errors & $valgrind_allocs & $valgrind_frees & $valgrind_bytes \\\\\n\\hline\n"
+        echo "$iteration;$run;$elapsed_time;$cpu_usage_percentage;$power_consumed;$valgrind_errors;$valgrind_allocs;$valgrind_frees;$valgrind_bytes" >> "$CSV_FILE"
     done
+
+    # Calculate averages and finalize JSON
+    ITERATION_RESULTS="${ITERATION_RESULTS%,}], \"tasks_executed\": $TOTAL_TASKS}"
+    RESULT_JSON+="$ITERATION_RESULTS,"
 
     # Calcul des moyennes
     AVG_TIME=$(awk "BEGIN {print $TOTAL_TIME / $REPETITIONS}")
     AVG_CPU=$(awk "BEGIN {print $TOTAL_CPU / $REPETITIONS}")
     AVG_POWER=$(awk "BEGIN {print $TOTAL_POWER / $REPETITIONS}")
-    AVG_ERRORS=$(awk "BEGIN {print $TOTAL_ERRORS / $REPETITIONS}")
-    AVG_ALLOCS=$(awk "BEGIN {print $TOTAL_ALLOCS / $REPETITIONS}")
-    AVG_FREES=$(awk "BEGIN {print $TOTAL_FREES / $REPETITIONS}")
     AVG_BYTES=$(awk "BEGIN {print $TOTAL_BYTES / $REPETITIONS}")
 
-    ITERATION_RESULTS+="{\"average\": {\"execution_time\": $AVG_TIME, \"cpu_usage\": $AVG_CPU, \"power_consumed\": $AVG_POWER, \"valgrind_errors\": $AVG_ERRORS, \"valgrind_allocs\": $AVG_ALLOCS, \"valgrind_frees\": $AVG_FREES, \"bytes_allocated\": $AVG_BYTES}}]}"
-    RESULT_JSON+="$ITERATION_RESULTS,"
-
-    RESULT_LATEX+="\\textbf{Average} & & $AVG_TIME & $AVG_CPU & $AVG_POWER & $AVG_ERRORS & $AVG_ALLOCS & $AVG_FREES & $AVG_BYTES \\\\\n\\hline\n"
+    RESULT_LATEX+="$iteration & Avg & $AVG_TIME & $AVG_CPU & $AVG_POWER & 0 & 0 & 0 & $AVG_BYTES \\\\\n\\hline\n"
 
     # Revenir au répertoire précédent
     echo "...Ending the Local Analysis of Iteration ${iteration}."
 done
 
-RESULT_JSON="${RESULT_JSON%,}}"
+# Finalize JSON and LaTeX
+RESULT_JSON="${RESULT_JSON%,}]"
 RESULT_LATEX+="\\end{tabular}"
 
-echo "$RESULT_JSON" > "output/results_$(date +"%Y%m%d_%H%M").json"
-echo -e "$RESULT_LATEX" > "output/results_$(date +"%Y%m%d_%H%M").tex"
+# Save outputs
+echo "$RESULT_JSON" > "$JSON_FILE"
+echo -e "$RESULT_LATEX" > "$LATEX_FILE"
 
-echo "Results saved in results.json and results.tex."
+echo "Results saved to ${JSON_FILE}, ${LATEX_FILE}, and ${CSV_FILE}."
