@@ -2,12 +2,12 @@
 
 # Iteration number
 ITERATIONS=7
-REPETITIONS=1
+REPETITIONS=5
 
 # TDP of Processor in use (depending of host hardware)
 TDP=95
-NUM_CORE=16
-TDP_PER_CORE=$(($TDP / $NUM_CORE))
+NUM_THREADS=16
+TDP_PER_CORE=$(($TDP / $NUM_THREADS))
 
 CPU_CORE=0
 
@@ -54,7 +54,7 @@ for iteration in $(seq 0 $ITERATIONS); do
 
     echo "Starting the Local Analysis of '${ITERATION_DIR}' on CPU Core ${CPU_CORE} ...\n"    
     echo "Total TDP: ${TDP} W" >> "${LOG_FILE}"
-    echo "Number of Cores: ${NUM_CORE}" >> "${LOG_FILE}"
+    echo "Number of Cores: ${NUM_THREADS}" >> "${LOG_FILE}"
     echo "TDP per Core: ${TDP_PER_CORE} W" >> "${LOG_FILE}"
     echo "Using CPU Core: ${CPU_CORE}" >> "${LOG_FILE}"
 
