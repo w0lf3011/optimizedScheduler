@@ -45,7 +45,7 @@ echo "Iteration;Run;Execution Time;CPU Usage;Power Consumed;Valgrind Errors;Valg
 
 
 # Loop of X Iterations configured
-for iteration in $(seq 6 $ITERATIONS); do
+for iteration in $(seq 0 $ITERATIONS); do
     ITERATION_DIR="Iteration_${iteration}"
     APP_NAME="optimizedscheduler${iteration}"
     APP="bin/${APP_NAME}"
