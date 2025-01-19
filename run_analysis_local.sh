@@ -2,7 +2,7 @@
 
 # Iteration number
 ITERATIONS=7
-REPETITIONS=5
+REPETITIONS=1
 
 # TDP of Processor in use (depending of host hardware)
 TDP=95
@@ -45,7 +45,7 @@ echo "Iteration;Run;Execution Time;CPU Usage;Power Consumed;Valgrind Errors;Valg
 
 
 # Loop of X Iterations configured
-for iteration in $(seq 0 $ITERATIONS); do
+for iteration in $(seq 6 $ITERATIONS); do
     ITERATION_DIR="Iteration_${iteration}"
     APP_NAME="optimizedscheduler${iteration}"
     APP="bin/${APP_NAME}"

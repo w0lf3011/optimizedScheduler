@@ -5,40 +5,64 @@
 #include <assert.h>
 #include <unistd.h>
 
-#define NUM_MEASURES 10       // Nombre de mesures stockées
-#define LED_PIN 25            // Pin GPIO pour la LED
-#define TEMP_SENSOR_ADDR 0x48 // Adresse I2C du capteur de température (exemple)
-#define PRIORITY_HIGH = 3
-#define PRIORITY_MEDIUM = 2
-#define PRIORITY_LOW = 1
+/// \brief Number of stored temperature measurements.
+#define NUM_MEASURES 10
 
+/// \brief GPIO pin for the LED.
+#define LED_PIN 25
 
-// Structure de la tâche avec priorité
+/// \brief I2C address of the temperature sensor (example).
+#define TEMP_SENSOR_ADDR 0x48
+
+/// \brief Task priority levels.
+#define PRIORITY_HIGH 3
+#define PRIORITY_MEDIUM 2
+#define PRIORITY_LOW 1
+
+/**
+ * \brief Task structure with priority.
+ */
 typedef struct {
-    void (*taskFunction)();  // Pointeur de fonction pour la tâche
-    uint32_t delay_ms;       // Délai avant l’exécution de la tâche en ms
-    uint8_t priority;        // Priorité de la tâche
+    void (*taskFunction)();  ///< Pointer to the task function.
+    uint32_t delay_ms;       ///< Delay before executing the task, in milliseconds.
+    uint8_t priority;        ///< Priority of the task.
 } Task;
 
+/// \brief Array for storing temperature values.
 float temperature_values[NUM_MEASURES];
+
+/// \brief Index of the current temperature measurement in the buffer.
 uint8_t measure_index = 0;
-bool buffer_full = false; // Indique si le buffer circulaire est plein
+
+/// \brief Indicates whether the circular buffer is full.
+bool buffer_full = false;
+
+/// \brief Global counter for executed tasks.
 uint8_t global_taskcounter = 0;
 
-// Increment Task Counter and show the task name.
+/**
+ * \brief Increments the global task counter and logs the task name.
+ * 
+ * \param taskName Name of the task being executed.
+ */
 void incrementTaskCounter(const char *taskName) {
     global_taskcounter++;
     printf("%d tasks executed so far. Last task: %s\n", global_taskcounter, taskName);
 }
 
-// Initialisation des périphériques
+/**
+ * \brief Initializes necessary peripherals (simulated for Linux).
+ */
 void init_peripherals() {
     printf("Initializing peripherals (simulated for Linux)...\n");
 }
 
-// Fonction pour lire la température
+/**
+ * \brief Reads a simulated temperature value from the sensor.
+ * 
+ * \return A temperature value in degrees Celsius.
+ */
 float read_temperature() {
-    // Set the range
     float min = -40.0f;
     float max = 60.0f;
 
@@ -48,7 +72,11 @@ float read_temperature() {
     return temp_1d;
 }
 
-// Fonction pour calculer la moyenne des températures
+/**
+ * \brief Calculates the average of the stored temperature values.
+ * 
+ * \return The average temperature value, or 0 if no measurements have been taken.
+ */
 float average() {
     float sum = 0.0;
     uint8_t count = buffer_full ? NUM_MEASURES : measure_index;
@@ -58,7 +86,11 @@ float average() {
     return (count > 0) ? (sum / count) : 0;
 }
 
-// Fonction pour allumer la LED X fois
+/**
+ * \brief Simulates blinking an LED a specified number of times.
+ * 
+ * \param times Number of times to blink the LED.
+ */
 void blink_led(uint8_t times) {
     printf("Simulating blinking LED %d times...\n", times);
     for (uint8_t i = 0; i < times; i++) {
@@ -69,13 +101,18 @@ void blink_led(uint8_t times) {
     }
 }
 
-// Fonction pour simuler un sleep
+/**
+ * \brief Simulates a sleep for the specified duration in milliseconds.
+ * 
+ * \param ms Sleep duration in milliseconds.
+ */
 void sleep_ms(uint32_t ms) {
-    usleep(ms * 1000);  // Convertit ms en µs
+    usleep(ms * 1000);  // Convert milliseconds to microseconds.
 }
 
-
-// Tâche: Obtenir la température actuelle du capteur
+/**
+ * \brief Task to retrieve the current temperature from the sensor.
+ */
 void runTempTask() {
     temperature_values[measure_index] = read_temperature();
     measure_index = (measure_index + 1) % NUM_MEASURES;
@@ -83,18 +120,22 @@ void runTempTask() {
     incrementTaskCounter("runTempTask");
 }
 
-// Tâche: Calculer la moyenne des températures collectées
+/**
+ * \brief Task to compute the average of the collected temperatures.
+ */
 void computeAvgTempTask() {
-    if (buffer_full) {  // Calcul seulement quand le buffer est plein
+    if (buffer_full) {  // Calculate only when the buffer is full.
         float average_temp = average();
         printf("Average of collected temperatures: %.2f°C\n", average_temp);
         incrementTaskCounter("computeAvgTempTask");
     }
 }
 
-// Tâche: Envoyer le résultat, simulé par le clignotement de la LED
+/**
+ * \brief Task to send results, simulated by blinking the LED.
+ */
 void sendResultTask() {
-    if (buffer_full) {  // Clignote seulement quand le buffer est plein
+    if (buffer_full) {  // Blink only when the buffer is full.
         blink_led(NUM_MEASURES);
         buffer_full = false;
         measure_index = 0;
@@ -102,25 +143,45 @@ void sendResultTask() {
     }
 }
 
-// Fonction de comparaison pour trier les tâches par priorité (plus élevé en premier)
+/**
+ * \brief Comparison function to sort tasks by priority (highest first).
+ * 
+ * \param a Pointer to the first task.
+ * \param b Pointer to the second task.
+ * \return A positive value if task `b` has a higher priority, a negative value if `a` does, or 0 if equal.
+ */
 int compare_tasks(const void* a, const void* b) {
     Task* taskA = (Task*)a;
     Task* taskB = (Task*)b;
-    return (taskB->priority - taskA->priority); // Ordre décroissant de priorité
+    return (taskB->priority - taskA->priority); // Descending order of priority.
 }
 
-// Fonction d'exécution de toutes les tâches
+/**
+ * \brief Executes tasks in the order of their priority.
+ * 
+ * \param tasks Array of tasks.
+ * \param task_count Number of tasks in the array.
+ */
 void task_scheduler(Task* tasks, uint8_t task_count) {
-    // Trier les tâches par priorité
+    // Sort tasks by priority
     qsort(tasks, task_count, sizeof(Task), compare_tasks);
     
-    // Exécuter chaque tâche dans l'ordre de priorité
+    // Execute each task in order of priority
     for (uint8_t i = 0; i < task_count; i++) {
-        tasks[i].taskFunction();     // Exécuter la tâche
-        sleep_ms(tasks[i].delay_ms); // Délai après chaque tâche
+        tasks[i].taskFunction();     // Execute the task
+        sleep_ms(tasks[i].delay_ms); // Delay after each task
     }
 }
 
+/**
+ * \brief Main entry point of the program.
+ * 
+ * This function initializes peripherals, sets up tasks, and runs them in a loop. The loop count can be specified as a command-line argument.
+ * 
+ * \param argc Number of command-line arguments.
+ * \param argv Array of command-line arguments. The first argument specifies the loop count (0 for infinite loop).
+ * \return Exit status code.
+ */
 int main(int argc, char *argv[]) {
     init_peripherals();
     
@@ -128,7 +189,7 @@ int main(int argc, char *argv[]) {
     bool infinite_loop = true;
 
     if (argc > 1) {
-        loop_count = atoi(argv[1]); // Convertir l'argument en entier
+        loop_count = atoi(argv[1]); // Convert the argument to an integer.
         if (loop_count < 0) {
             printf("Invalid argument. Usage: %s <loop count>.\n", argv[0]);
             return 1;
@@ -137,16 +198,15 @@ int main(int argc, char *argv[]) {
         }
     }
 	
-
-    // Création des tâches avec leurs fonctions, délais et priorités
+    // Define tasks with their functions, delays, and priorities
     Task tasks[] = {
-        { runTempTask, 5000, 1 },         // Priorité basse
-        { computeAvgTempTask, 5000, 2 },  // Priorité moyenne
-        { sendResultTask, 1000, 3 }       // Priorité haute
+        { runTempTask, 5000, PRIORITY_LOW },
+        { computeAvgTempTask, 5000, PRIORITY_MEDIUM },
+        { sendResultTask, 1000, PRIORITY_HIGH }
     };
     uint8_t task_count = sizeof(tasks) / sizeof(tasks[0]);
     
-    while (infinite_loop || loop_count>0) {
+    while (infinite_loop || loop_count > 0) {
         task_scheduler(tasks, task_count);
         sleep_ms(1000);
         loop_count--;

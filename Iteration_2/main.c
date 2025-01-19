@@ -2,43 +2,61 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <assert.h>
 #include <unistd.h>
 
-#define NUM_MEASURES 10       // Nombre de mesures stockées
-#define LED_PIN 25            // Pin GPIO pour la LED
-#define TEMP_SENSOR_ADDR 0x48 // Adresse I2C du capteur de température (exemple)
+/// \brief Number of stored temperature measurements.
+#define NUM_MEASURES 10
 
-// Structure de la tâche avec priorité et poids
+/// \brief GPIO pin for the LED.
+#define LED_PIN 25
+
+/// \brief I2C address of the temperature sensor (example).
+#define TEMP_SENSOR_ADDR 0x48
+
+/**
+ * \brief Task structure with priority, weight, and dependencies.
+ */
 typedef struct Task {
-    void (*taskFunction)();   // Pointeur de fonction pour la tâche
-    uint32_t delay_ms;        // Délai avant l’exécution de la tâche en ms
-    uint8_t priority;         // Priorité de la tâche (plus élevé = plus prioritaire)
-    uint8_t weight;           // Poids représentant le coût ou la durée d’exécution
-    struct Task** dependencies; // Pointeurs vers les tâches dépendantes
-    uint8_t num_dependencies; // Nombre de dépendances
+    void (*taskFunction)();      ///< Pointer to the task function.
+    uint32_t delay_ms;           ///< Delay before executing the task in milliseconds.
+    uint8_t priority;            ///< Priority of the task (higher value = higher priority).
+    uint8_t weight;              ///< Weight representing task execution cost or duration.
+    struct Task** dependencies;  ///< Pointers to dependent tasks.
+    uint8_t num_dependencies;    ///< Number of dependencies.
 } Task;
 
+/// \brief Circular buffer for storing temperature values.
 float temperature_values[NUM_MEASURES];
+/// \brief Current index in the circular buffer.
 uint8_t measure_index = 0;
-bool buffer_full = false; // Indique si le buffer circulaire est plein
+/// \brief Indicates whether the circular buffer is full.
+bool buffer_full = false;
+/// \brief Global counter for executed tasks.
 uint8_t global_taskcounter = 0;
 
-// Increment Task Counter and show the task name.
+/**
+ * \brief Increments the global task counter and logs the task name.
+ * 
+ * \param taskName Name of the executed task.
+ */
 void incrementTaskCounter(const char *taskName) {
     global_taskcounter++;
     printf("%d tasks executed so far. Last task: %s\n", global_taskcounter, taskName);
 }
 
-
-// Initialisation des périphériques
+/**
+ * \brief Initializes necessary peripherals (simulated for Linux).
+ */
 void init_peripherals() {
     printf("Initializing peripherals (simulated for Linux)...\n");
 }
 
-// Fonction pour lire la température
+/**
+ * \brief Reads a simulated temperature value from the sensor.
+ * 
+ * \return A temperature value in degrees Celsius.
+ */
 float read_temperature() {
-    // Set the range
     float min = -40.0f;
     float max = 60.0f;
 
@@ -48,7 +66,11 @@ float read_temperature() {
     return temp_1d;
 }
 
-// Fonction pour calculer la moyenne des températures
+/**
+ * \brief Calculates the average of the stored temperature values.
+ * 
+ * \return The average temperature value, or 0 if no measurements have been taken.
+ */
 float average() {
     float sum = 0.0;
     uint8_t count = buffer_full ? NUM_MEASURES : measure_index;
@@ -58,7 +80,11 @@ float average() {
     return (count > 0) ? (sum / count) : 0;
 }
 
-// Fonction pour allumer la LED X fois
+/**
+ * \brief Simulates blinking an LED a specified number of times.
+ * 
+ * \param times Number of times to blink the LED.
+ */
 void blink_led(uint8_t times) {
     printf("Simulating blinking LED %d times...\n", times);
     for (uint8_t i = 0; i < times; i++) {
@@ -69,12 +95,18 @@ void blink_led(uint8_t times) {
     }
 }
 
-// Fonction pour simuler un sleep
+/**
+ * \brief Simulates a sleep for the specified duration in milliseconds.
+ * 
+ * \param ms Sleep duration in milliseconds.
+ */
 void sleep_ms(uint32_t ms) {
-    usleep(ms * 1000);  // Convertit ms en µs
+    usleep(ms * 1000);  // Convert milliseconds to microseconds.
 }
 
-// Tâche: Obtenir la température actuelle du capteur
+/**
+ * \brief Task to retrieve the current temperature from the sensor.
+ */
 void runTempTask() {
     temperature_values[measure_index] = read_temperature();
     measure_index = (measure_index + 1) % NUM_MEASURES;
@@ -82,18 +114,22 @@ void runTempTask() {
     incrementTaskCounter("runTempTask");
 }
 
-// Tâche: Calculer la moyenne des températures collectées
+/**
+ * \brief Task to compute the average of the collected temperatures.
+ */
 void computeAvgTempTask() {
-    if (buffer_full) {  // Calcul seulement quand le buffer est plein
+    if (buffer_full) {  // Calculate only when the buffer is full.
         float average_temp = average();
         printf("Average of collected temperatures: %.2f°C\n", average_temp);
         incrementTaskCounter("computeAvgTempTask");
     }
 }
 
-// Tâche: Envoyer le résultat, simulé par le clignotement de la LED
+/**
+ * \brief Task to send results, simulated by blinking the LED.
+ */
 void sendResultTask() {
-    if (buffer_full) {  // Clignote seulement quand le buffer est plein
+    if (buffer_full) {  // Blink only when the buffer is full.
         blink_led(NUM_MEASURES);
         buffer_full = false;
         measure_index = 0;
@@ -101,20 +137,29 @@ void sendResultTask() {
     }
 }
 
-// Fonction pour trier les tâches en fonction du poids et de la priorité
+/**
+ * \brief Compares two tasks based on priority and weight for sorting.
+ * 
+ * \param a Pointer to the first task.
+ * \param b Pointer to the second task.
+ * \return A positive value if task `b` has higher priority or lower weight, negative otherwise.
+ */
 int compare_tasks(const void* a, const void* b) {
     Task* taskA = *(Task**)a;
     Task* taskB = *(Task**)b;
-    // Tâches avec une priorité plus élevée ou un poids inférieur sont préférées
     if (taskA->priority != taskB->priority) {
         return taskB->priority - taskA->priority;
     }
     return taskA->weight - taskB->weight;
 }
 
-// Fonction pour exécuter les tâches dans l'ordre des priorités et dépendances
+/**
+ * \brief Executes tasks in order of priority and dependencies.
+ * 
+ * \param tasks Array of task pointers.
+ * \param task_count Number of tasks in the array.
+ */
 void execute_tasks(Task* tasks[], uint8_t task_count) {
-    // Tri des tâches par priorité et poids
     qsort(tasks, task_count, sizeof(Task*), compare_tasks);
 
     bool task_completed[task_count];
@@ -126,7 +171,7 @@ void execute_tasks(Task* tasks[], uint8_t task_count) {
         Task* task = tasks[i];
         bool ready_to_run = true;
 
-        // Check Dependencies
+        // Check dependencies
         for (uint8_t j = 0; j < task->num_dependencies; j++) {
             Task* dependency = task->dependencies[j];
             if (!task_completed[i]) {
@@ -143,31 +188,34 @@ void execute_tasks(Task* tasks[], uint8_t task_count) {
     }
 }
 
+/**
+ * \brief Main entry point of the program.
+ * 
+ * Initializes peripherals, sets up tasks, and executes them in a loop. Accepts an optional loop count argument.
+ * 
+ * \param argc Number of command-line arguments.
+ * \param argv Array of command-line arguments. The first argument specifies the loop count (0 for infinite loop).
+ * \return Exit status code.
+ */
 int main(int argc, char *argv[]) {
     init_peripherals();
 
     int loop_count = (argc > 1) ? atoi(argv[1]) : 0;
     bool infinite_loop = (loop_count == 0);
 
-    // Création des tâches avec leurs fonctions, délais, priorités et poids
+    // Define tasks with their functions, delays, priorities, weights, and dependencies.
     static Task runTempTaskStruct = { runTempTask, 5000, 3, 1, NULL, 0 };
     static Task computeAvgTempTaskStruct = { computeAvgTempTask, 5000, 2, 2, NULL, 0 };
     static Task sendResultTaskStruct = { sendResultTask, 1000, 1, 3, NULL, 0 };
-    
+
     static Task* dependencies[] = { &computeAvgTempTaskStruct };
     sendResultTaskStruct.dependencies = dependencies;
     sendResultTaskStruct.num_dependencies = 1;
 
-    // Initialisation des dépendances
     Task* tasks[] = { &runTempTaskStruct, &computeAvgTempTaskStruct, &sendResultTaskStruct };
     uint8_t task_count = sizeof(tasks) / sizeof(tasks[0]);
-    
-    printf("Num Dep: %d\n", sendResultTaskStruct.num_dependencies);
-    printf("Num Dep 0 tasks: %d\n", tasks[0]->num_dependencies);
-    printf("Num Dep 1 tasks: %d\n", tasks[1]->num_dependencies);
-    printf("Num Dep 2 tasks: %d\n", tasks[2]->num_dependencies);
 
-    while (infinite_loop || loop_count>0) {
+    while (infinite_loop || loop_count > 0) {
         execute_tasks(tasks, task_count);
         sleep_ms(1000);
         loop_count--;

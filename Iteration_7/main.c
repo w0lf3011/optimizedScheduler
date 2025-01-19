@@ -8,39 +8,71 @@
 #include <stdlib.h>
 #include <stddef.h>
 
-#define NUM_MEASURES 10
+#define NUM_MEASURES 10 ///< Number of stored temperature measurements.
 
 /////////////////////
 /// Global variables
 /////////////////////
 
-
+/**
+ * \brief Array to store temperature measurements.
+ */
 float temperature_values[NUM_MEASURES];
-uint8_t measure_index = 0;
-bool buffer_full = false;
-uint8_t simulated_hour = 5;   // Heure simulée pour la source d'énergie
-uint8_t simulated_day = 0;    // Jour simulé pour la durée de simulation
 
-// Variable globale pour stocker les paramètres de l'objectif
+/**
+ * \brief Current index in the temperature measurements array.
+ */
+uint8_t measure_index = 0;
+
+/**
+ * \brief Flag indicating if the buffer is full.
+ */
+bool buffer_full = false;
+
+/**
+ * \brief Simulated current hour (0-23).
+ */
+uint8_t simulated_hour = 5;
+
+/**
+ * \brief Simulated current day.
+ */
+uint8_t simulated_day = 0;
+
+/**
+ * \brief Global parameters for the simulation goal.
+ */
 GoalParameters global_goal_params;
+
+/**
+ * \brief Counter for the total number of executed tasks.
+ */
 uint8_t global_taskcounter = 0;
 
-// Increment Task Counter and show the task name.
+/////////////////////
+/// Helper Functions
+/////////////////////
+
+/**
+ * \brief Increments the global task counter and logs the task name.
+ * 
+ * \param taskName The name of the executed task.
+ */
 void incrementTaskCounter(const char *taskName) {
     global_taskcounter++;
     printf("%d tasks executed so far. Last task: %s\n", global_taskcounter, taskName);
 }
 
-
-
-
 /////////////////////
 /// Implementation of Tasks
 /////////////////////
 
-// Fonction pour lire la température
+/**
+ * \brief Reads a simulated temperature value from the sensor.
+ * 
+ * \return A temperature value in degrees Celsius.
+ */
 float read_temperature() {
-    // Set the range
     float min = -40.0f;
     float max = 60.0f;
 
@@ -50,7 +82,11 @@ float read_temperature() {
     return temp_1d;
 }
 
-// Fonction pour calculer la moyenne des températures
+/**
+ * \brief Calculates the average of the stored temperature values.
+ * 
+ * \return The average temperature value.
+ */
 float average() {
     float sum = 0.0;
     uint8_t count = buffer_full ? NUM_MEASURES : measure_index;
@@ -60,7 +96,9 @@ float average() {
     return (count > 0) ? (sum / count) : 0;
 }
 
-// Task - Read Temperature sensor
+/**
+ * \brief Task to read the current temperature from the sensor.
+ */
 void runTempTask() {
     temperature_values[measure_index] = read_temperature();
     measure_index = (measure_index + 1) % NUM_MEASURES;
@@ -68,18 +106,22 @@ void runTempTask() {
     incrementTaskCounter("runTempTask");
 }
 
-// Task - Compute the average of the Temperature collected
+/**
+ * \brief Task to compute the average temperature from collected data.
+ */
 void computeAvgTempTask() {
-    if (buffer_full) {  // Calcul seulement quand le buffer est plein
+    if (buffer_full) {
         float average_temp = average();
         printf("Average of collected temperatures: %.2f C\n", average_temp);
         incrementTaskCounter("computeAvgTempTask");
     }
 }
 
-// Task - Send the computed data to a received // This feature is simulated by a led blinking.
+/**
+ * \brief Task to send computed data, simulated by blinking an LED.
+ */
 void sendResultTask() {
-    if (buffer_full) {  // Clignote seulement quand le buffer est plein
+    if (buffer_full) {
         blink_led(NUM_MEASURES);
         buffer_full = false;
         measure_index = 0;
@@ -87,7 +129,9 @@ void sendResultTask() {
     }
 }
 
-// Fonction pour forcer l'update de l'heure simulée
+/**
+ * \brief Updates the simulated hour and day.
+ */
 void update_simulated_hour() {
     simulated_hour = (simulated_hour + 1) % 24;
     if (simulated_hour == 0) {
@@ -95,25 +139,38 @@ void update_simulated_hour() {
     }
 }
 
-
-// Fonction pour obtenir l'heure simulée
+/**
+ * \brief Gets the current simulated hour.
+ * 
+ * \return The current simulated hour (0-23).
+ */
 uint8_t get_current_hour() {
     return simulated_hour;
 }
 
-
-
+/**
+ * \brief Main entry point of the program.
+ * 
+ * This function initializes peripherals, sets up tasks and energy sources,
+ * and manages the execution of tasks dynamically based on energy availability
+ * and simulation goals.
+ * 
+ * \param argc Number of command-line arguments.
+ * \param argv Array of command-line arguments. The first argument specifies 
+ *             the simulation duration in days (0 for infinite loop).
+ * 
+ * \return Exit status code.
+ */
 int main(int argc, char *argv[]) {
-	
-
-    // Initialisation des périphériques et de la file d'attente
+    // Initialize peripherals and task queue
     init_peripherals();
     TaskQueue* queue = init_task_queue(MAX_TASKS);
-    
+
+    // Parse simulation duration
     int duration_days = (argc > 1) ? atoi(argv[1]) : 0;
     bool infinite_loop = (duration_days == 0);
 
-    // Initialisation des tâches
+    // Initialize tasks
     static Task runTempTaskStruct = { runTempTask, 5000, 2, 3, false, 0.0, NULL, 0 };
     static Task computeAvgTempTaskStruct = { computeAvgTempTask, 5000, 1, 2, true, 0.0, NULL, 0 };
     static Task sendResultTaskStruct = { sendResultTask, 1000, 3, 1, true, 0.0, NULL, 0 };
@@ -126,11 +183,11 @@ int main(int argc, char *argv[]) {
     enqueue_task(queue, &computeAvgTempTaskStruct);
     enqueue_task(queue, &sendResultTaskStruct);
 
-    // Initialisation de la source d'énergie et des paramètres
+    // Initialize energy source and parameters
     EnergySource energy_source = { SOLAR, 6, 12, 1, {0}, 0.0 };
     GoalParameters goal_params = { MAXIMIZE_RESILIENCE, duration_days };
 
-    // Simulation principale
+    // Main simulation loop
     while (infinite_loop || simulated_day < goal_params.duration_days) {
         if (is_energy_available(&energy_source, get_current_hour())) {
             update_energy_profile(&energy_source);
@@ -141,7 +198,7 @@ int main(int argc, char *argv[]) {
         update_simulated_hour();
     }
 
-    // Libération de la file d'attente
+    // Free task queue
     free_task_queue(queue);
     return 0;
 }

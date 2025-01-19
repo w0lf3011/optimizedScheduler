@@ -5,89 +5,118 @@
 #include <assert.h>
 #include <unistd.h>
 
-#define NUM_MEASURES 10       // Nombre de mesures stockées
-#define LED_PIN 25            // Pin GPIO pour la LED
-#define TEMP_SENSOR_ADDR 0x48 // Adresse I2C du capteur de température (exemple)
-#define DEFAULT_SIMULATION_DAYS 7  // Durée par défaut de la simulation en jours
-#define HISTORY_DAYS 5        // Nombre de jours d'historique pour le profil d'intermittence
+/// \brief Number of stored temperature measurements.
+#define NUM_MEASURES 10
 
-// Types de sources d'énergie
+/// \brief GPIO pin for the LED.
+#define LED_PIN 25
+
+/// \brief I2C address of the temperature sensor (example).
+#define TEMP_SENSOR_ADDR 0x48
+
+/// \brief Default simulation duration in days.
+#define DEFAULT_SIMULATION_DAYS 7
+
+/// \brief Number of days for historical availability profile.
+#define HISTORY_DAYS 5
+
+/**
+ * \brief Types of energy sources.
+ */
 typedef enum {
-    SOLAR,
-    WIND,
-    BATTERY
+    SOLAR,   ///< Solar energy.
+    WIND,    ///< Wind energy.
+    BATTERY  ///< Battery energy.
 } EnergyType;
 
-// Enumération des objectifs possibles
+/**
+ * \brief Types of simulation goals.
+ */
 typedef enum {
-    MAXIMIZE_TASKS,
-    MAXIMIZE_RESILIENCE
+    MAXIMIZE_TASKS,     ///< Goal: Maximize the number of tasks executed.
+    MAXIMIZE_RESILIENCE ///< Goal: Maximize resilience by prioritizing critical tasks.
 } GoalType;
 
-// Structure pour définir une source d'énergie avec historique d'intermittence
+/**
+ * \brief Structure defining an energy source with intermittency history.
+ */
 typedef struct {
-    EnergyType type;              // Type de source (solaire, éolienne, batterie)
-    uint8_t start_hour;           // Heure de début de la première occurrence (0-23)
-    uint8_t duration_hours;       // Durée de chaque période d'alimentation en heures
-    uint8_t occurrences_per_day;  // Nombre de fois que la source est disponible par jour
-    uint8_t availability_history[HISTORY_DAYS]; // Historique de disponibilité sur plusieurs jours (en heures)
-    float predictability;         // Niveau de prévisibilité basé sur l'historique
+    EnergyType type;              ///< Type of energy source.
+    uint8_t start_hour;           ///< Start hour of the first occurrence (0-23).
+    uint8_t duration_hours;       ///< Duration of each active period in hours.
+    uint8_t occurrences_per_day;  ///< Number of times the energy source is available per day.
+    uint8_t availability_history[HISTORY_DAYS]; ///< Historical availability in hours for past days.
+    float predictability;         ///< Predictability score based on historical data.
 } EnergySource;
 
-// Structure des paramètres de l'objectif
+/**
+ * \brief Structure defining simulation goal parameters.
+ */
 typedef struct {
-    GoalType goal;               // Objectif sélectionné
-    uint8_t duration_days;       // Durée de la simulation en jours
+    GoalType goal;               ///< Selected simulation goal.
+    uint8_t duration_days;       ///< Duration of the simulation in days.
 } GoalParameters;
 
-// Structure de la tâche avec métrique heuristique
+/**
+ * \brief Structure representing a task with heuristic metrics.
+ */
 typedef struct Task {
-    void (*taskFunction)();      // Pointeur de fonction pour la tâche
-    uint32_t delay_ms;           // Délai avant l’exécution de la tâche en ms
-    uint8_t priority;            // Priorité de la tâche (plus élevé = plus prioritaire)
-    uint8_t weight;              // Poids représentant le coût ou la durée d’exécution
-    bool critical;               // Indique si la tâche est critique pour la résilience
-    float heuristic_metric;      // Métrique heuristique pour la tâche
-    struct Task** dependencies;  // Pointeurs vers les tâches dépendantes
-    uint8_t num_dependencies;    // Nombre de dépendances
+    void (*taskFunction)();      ///< Pointer to the task function.
+    uint32_t delay_ms;           ///< Delay before executing the task, in milliseconds.
+    uint8_t priority;            ///< Task priority (higher value = higher priority).
+    uint8_t weight;              ///< Task weight representing execution cost or duration.
+    bool critical;               ///< Indicates if the task is critical for resilience.
+    float heuristic_metric;      ///< Heuristic metric calculated based on task properties.
+    struct Task** dependencies;  ///< Pointers to dependent tasks.
+    uint8_t num_dependencies;    ///< Number of dependencies.
 } Task;
 
-float temperature_values[NUM_MEASURES];
-uint8_t measure_index = 0;
-bool buffer_full = false;
-uint8_t simulated_hour = 5;   // Heure simulée pour la source d'énergie
-uint8_t simulated_day = 0;    // Jour simulé pour la durée de simulation
+float temperature_values[NUM_MEASURES]; ///< Circular buffer for storing temperature values.
+uint8_t measure_index = 0;              ///< Current index in the circular buffer.
+bool buffer_full = false;               ///< Indicates whether the circular buffer is full.
+uint8_t simulated_hour = 5;             ///< Simulated current hour (0-23).
+uint8_t simulated_day = 0;              ///< Simulated current day of the simulation.
 
+GoalParameters global_goal_params; ///< Global variable for storing goal parameters.
+uint8_t global_taskcounter = 0;    ///< Global counter for executed tasks.
 
-// Variable globale pour stocker les paramètres de l'objectif
-GoalParameters global_goal_params;
-uint8_t global_taskcounter = 0;
-
-// Increment Task Counter and show the task name.
+/**
+ * \brief Increments the global task counter and logs the task name.
+ * 
+ * \param taskName Name of the executed task.
+ */
 void incrementTaskCounter(const char *taskName) {
     global_taskcounter++;
     printf("%d tasks executed so far. Last task: %s\n", global_taskcounter, taskName);
 }
 
-
-// Initialisation des périphériques
+/**
+ * \brief Initializes peripherals (simulated for Linux).
+ */
 void init_peripherals() {
     printf("Initializing peripherals (simulated for Linux)...\n");
 }
 
-// Fonction pour lire la température
+/**
+ * \brief Reads a simulated temperature value from the sensor.
+ * 
+ * \return A temperature value in degrees Celsius.
+ */
 float read_temperature() {
-    // Set the range
     float min = -40.0f;
     float max = 60.0f;
 
     float temp = min + ((float)rand() / (float)RAND_MAX) * (max - min);
     float temp_1d = ((int)(temp * 10)) / 10.0f;
-    printf("Read a temperature of %.f\n", temp_1d);
+    printf("Read a temperature of %.f°C\n", temp_1d);
     return temp_1d;
 }
 
-// Fonction pour calculer la moyenne des températures
+/**
+ * \brief Calculates the average of the stored temperature values.
+ * 
+ * \return The average temperature value, or 0 if no measurements have been taken.
+ */
 float average() {
     float sum = 0.0;
     uint8_t count = buffer_full ? NUM_MEASURES : measure_index;
@@ -97,7 +126,11 @@ float average() {
     return (count > 0) ? (sum / count) : 0;
 }
 
-// Fonction pour allumer la LED X fois
+/**
+ * \brief Simulates blinking an LED a specified number of times.
+ * 
+ * \param times Number of times to blink the LED.
+ */
 void blink_led(uint8_t times) {
     printf("Simulating blinking LED %d times...\n", times);
     for (uint8_t i = 0; i < times; i++) {
@@ -108,12 +141,18 @@ void blink_led(uint8_t times) {
     }
 }
 
-// Fonction pour simuler un sleep
+/**
+ * \brief Simulates a sleep for the specified duration in milliseconds.
+ * 
+ * \param ms Sleep duration in milliseconds.
+ */
 void sleep_ms(uint32_t ms) {
-    usleep(ms * 1000);  // Convertit ms en µs
+    usleep(ms * 1000);  // Convert milliseconds to microseconds.
 }
 
-// Tâche: Obtenir la température actuelle du capteur
+/**
+ * \brief Task to retrieve the current temperature from the sensor.
+ */
 void runTempTask() {
     temperature_values[measure_index] = read_temperature();
     measure_index = (measure_index + 1) % NUM_MEASURES;
@@ -121,18 +160,22 @@ void runTempTask() {
     incrementTaskCounter("runTempTask");
 }
 
-// Tâche: Calculer la moyenne des températures collectées
+/**
+ * \brief Task to compute the average of the collected temperatures.
+ */
 void computeAvgTempTask() {
-    if (buffer_full) {  // Calcul seulement quand le buffer est plein
+    if (buffer_full) {
         float average_temp = average();
         printf("Average of collected temperatures: %.2f°C\n", average_temp);
         incrementTaskCounter("computeAvgTempTask");
     }
 }
 
-// Tâche: Envoyer le résultat, simulé par le clignotement de la LED
+/**
+ * \brief Task to send results, simulated by blinking the LED.
+ */
 void sendResultTask() {
-    if (buffer_full) {  // Clignote seulement quand le buffer est plein
+    if (buffer_full) {
         blink_led(NUM_MEASURES);
         buffer_full = false;
         measure_index = 0;
@@ -140,12 +183,9 @@ void sendResultTask() {
     }
 }
 
-// Fonction pour obtenir l'heure simulée
-uint8_t get_current_hour() {
-    return simulated_hour;
-}
-
-// Fonction pour forcer l'update de l'heure simulée
+/**
+ * \brief Updates the simulated current hour.
+ */
 void update_simulated_hour() {
     simulated_hour = (simulated_hour + 1) % 24;
     if (simulated_hour == 0) {
@@ -153,7 +193,49 @@ void update_simulated_hour() {
     }
 }
 
-// Fonction pour vérifier la disponibilité de la source d'énergie
+/**
+ * \brief Gets the current simulated hour.
+ * 
+ * \return The simulated current hour (0-23).
+ */
+uint8_t get_current_hour() {
+    return simulated_hour;
+}
+
+/**
+ * \brief Updates the energy profile and calculates predictability.
+ * 
+ * \param source Pointer to the energy source.
+ */
+void update_energy_profile(EnergySource *source) {
+    uint8_t available_hours_today = source->duration_hours * source->occurrences_per_day;
+
+    for (int i = HISTORY_DAYS - 1; i > 0; i--) {
+        source->availability_history[i] = source->availability_history[i - 1];
+    }
+    source->availability_history[0] = available_hours_today;
+
+    float total = 0;
+    float variance = 0;
+
+    for (int i = 0; i < HISTORY_DAYS; i++) {
+        total += source->availability_history[i];
+    }
+    float mean = total / HISTORY_DAYS;
+
+    for (int i = 0; i < HISTORY_DAYS; i++) {
+        variance += (source->availability_history[i] - mean) * (source->availability_history[i] - mean);
+    }
+    source->predictability = 1.0f / (1.0f + (variance / HISTORY_DAYS));
+}
+
+
+/**
+ * \brief Checks if the specified energy source is available.
+ * 
+ * \param source Pointer to the energy source.
+ * \return True if the energy source is available; otherwise, false.
+ */
 bool is_energy_available(EnergySource *source) {
     uint8_t current_hour = get_current_hour();
     uint8_t interval_hours = 24 / source->occurrences_per_day;
@@ -175,28 +257,12 @@ bool is_energy_available(EnergySource *source) {
     return false;
 }
 
-// Fonction pour mettre à jour le profil d'intermittence et calculer la prévisibilité
-void update_energy_profile(EnergySource *source) {
-    uint8_t available_hours_today = source->duration_hours * source->occurrences_per_day;
-    for (int i = HISTORY_DAYS - 1; i > 0; i--) {
-        source->availability_history[i] = source->availability_history[i - 1];
-    }
-    source->availability_history[0] = available_hours_today;
-
-    // Calcul de la prévisibilité en utilisant l'historique
-    float total = 0;
-    float variance = 0;
-    for (int i = 0; i < HISTORY_DAYS; i++) {
-        total += source->availability_history[i];
-    }
-    float mean = total / HISTORY_DAYS;
-    for (int i = 0; i < HISTORY_DAYS; i++) {
-        variance += (source->availability_history[i] - mean) * (source->availability_history[i] - mean);
-    }
-    source->predictability = 1.0f / (1.0f + (variance / HISTORY_DAYS));
-}
-
-// Fonction pour calculer la métrique heuristique de chaque tâche
+/**
+ * \brief Calculates the heuristic metric for a task.
+ * 
+ * \param task Pointer to the task structure.
+ * \param goal_params Pointer to the goal parameters.
+ */
 void calculate_heuristic_metric(Task *task, GoalParameters *goal_params) {
     if (goal_params->goal == MAXIMIZE_TASKS) {
         task->heuristic_metric = task->priority * 0.5 + task->weight * 0.5;
@@ -205,7 +271,13 @@ void calculate_heuristic_metric(Task *task, GoalParameters *goal_params) {
     }
 }
 
-// Fonction pour trier les tâches en fonction de la métrique heuristique
+/**
+ * \brief Compares tasks based on heuristic metrics for sorting.
+ * 
+ * \param a Pointer to the first task.
+ * \param b Pointer to the second task.
+ * \return Comparison result for sorting.
+ */
 int compare_tasks(const void* a, const void* b) {
     Task* taskA = *(Task**)a;
     Task* taskB = *(Task**)b;
@@ -214,7 +286,14 @@ int compare_tasks(const void* a, const void* b) {
     return 0;
 }
 
-// Fonction pour exécuter les tâches en fonction de l'objectif sélectionné
+/**
+ * \brief Executes tasks based on the selected goal and energy availability.
+ * 
+ * \param tasks Array of task pointers.
+ * \param task_count Number of tasks in the array.
+ * \param source Pointer to the energy source.
+ * \param goal_params Pointer to the goal parameters.
+ */
 void execute_tasks(Task* tasks[], uint8_t task_count, EnergySource *source, GoalParameters *goal_params) {
     update_energy_profile(source);
 
@@ -223,12 +302,10 @@ void execute_tasks(Task* tasks[], uint8_t task_count, EnergySource *source, Goal
         return;
     }
 
-    // Calculer la métrique heuristique pour chaque tâche
     for (int i = 0; i < task_count; i++) {
         calculate_heuristic_metric(tasks[i], goal_params);
     }
 
-    // Tri des tâches en fonction de la métrique heuristique
     qsort(tasks, task_count, sizeof(Task*), compare_tasks);
 
     bool task_completed[task_count];
@@ -240,7 +317,6 @@ void execute_tasks(Task* tasks[], uint8_t task_count, EnergySource *source, Goal
         Task* task = tasks[i];
         bool ready_to_run = true;
 
-        // Check Dependencies
         for (uint8_t j = 0; j < task->num_dependencies; j++) {
             if (!task_completed[j]) {
                 ready_to_run = false;
@@ -256,9 +332,18 @@ void execute_tasks(Task* tasks[], uint8_t task_count, EnergySource *source, Goal
     }
 }
 
+/**
+ * \brief Main entry point of the program.
+ * 
+ * Initializes peripherals, sets up tasks, and executes them in a loop based on energy availability.
+ * 
+ * \param argc Number of command-line arguments.
+ * \param argv Array of command-line arguments. The first argument specifies the simulation duration (in days, 0 for infinite loop).
+ * \return Exit status code.
+ */
 int main(int argc, char *argv[]) {
     init_peripherals();
-    
+
     int duration_days = (argc > 1) ? atoi(argv[1]) : 0;
     bool infinite_loop = (duration_days == 0);
 
@@ -274,7 +359,6 @@ int main(int argc, char *argv[]) {
     uint8_t task_count = sizeof(tasks) / sizeof(tasks[0]);
 
     EnergySource energy_source = { SOLAR, 6, 12, 1, {0}, 0.0 };
-
     GoalParameters goal_params = { MAXIMIZE_RESILIENCE, duration_days };
 
     while (infinite_loop || simulated_day < goal_params.duration_days) {

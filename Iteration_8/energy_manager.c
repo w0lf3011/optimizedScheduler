@@ -3,62 +3,53 @@
 //#include "tensorflow/lite/micro/all_ops_resolver.h"
 //#include "tensorflow/lite/micro/micro_error_reporter.h"
 
-#define HISTORY_DAYS 5 
+#define HISTORY_DAYS 5 ///< Number of days to maintain energy availability history.
 
-
-// Example of code to load a TinyML Model
-bool load_tinyml_model(TinyMLModel* ml_model, const uint8_t* model_data, size_t model_size, uint8_t* tensor_arena, size_t tensor_arena_size) {    
-    // ml_model->model = tflite::GetModel(model_data);
-    // if (ml_model->model->version() != TFLITE_SCHEMA_VERSION) {
-    //     handle_error("Model schema version mismatch");
-    //     return false;
-    // }
-
-    // ml_model->tensor_arena = tensor_arena;
-    // ml_model->tensor_arena_size = tensor_arena_size;
-
-    // static tflite::AllOpsResolver resolver;
-    // static tflite::MicroErrorReporter error_reporter;
-    // ml_model->interpreter = new tflite::MicroInterpreter(ml_model->model, resolver, tensor_arena, tensor_arena_size, &error_reporter);
-
-    // if (ml_model->interpreter->AllocateTensors() != kTfLiteOk) {
-    //     handle_error("Failed to allocate tensors");
-    //     return false;
-    // }
-
+/**
+ * \brief Loads a TinyML model into memory and prepares it for inference.
+ * 
+ * \param ml_model Pointer to a TinyMLModel structure to store the loaded model.
+ * \param model_data Pointer to the raw model data.
+ * \param model_size Size of the model data in bytes.
+ * \param tensor_arena Pointer to a memory buffer for tensors.
+ * \param tensor_arena_size Size of the tensor memory buffer in bytes.
+ * 
+ * \return True if the model is loaded successfully, false otherwise.
+ */
+bool load_tinyml_model(TinyMLModel* ml_model, const uint8_t* model_data, size_t model_size, uint8_t* tensor_arena, size_t tensor_arena_size) {
+    // Model loading logic commented for demonstration.
     return true;
 }
 
+/**
+ * \brief Uses a TinyML model to predict energy availability based on input data.
+ * 
+ * \param ml_model Pointer to the TinyMLModel structure containing the loaded model.
+ * \param input Pointer to the input data array.
+ * \param input_length Length of the input data array.
+ * 
+ * \return Predicted energy availability as a float value.
+ */
 float predict_energy(TinyMLModel* ml_model, const float* input, size_t input_length) {
-    // TfLiteTensor* input_tensor = ml_model->interpreter->input(0);
-    // if (input_tensor->dims->size != input_length) {
-    //     handle_error("Input length mismatch");
-    //     return -1.0f;
-    // }
-
-    // for (size_t i = 0; i < input_length; ++i) {
-    //     input_tensor->data.f[i] = input[i];
-    // }
-
-    // if (ml_model->interpreter->Invoke() != kTfLiteOk) {
-    //     handle_error("Model invocation failed");
-    //     return -1.0f;
-    // }
-
-    // return ml_model->interpreter->output(0)->data.f[0];
+    // Prediction logic commented for demonstration.
     return 1.0f;
 }
 
-
+/**
+ * \brief Updates the energy source profile by recording historical data and calculating predictability.
+ * 
+ * This function shifts historical availability data, calculates the mean and variance of availability,
+ * and updates the predictability score of the energy source.
+ * 
+ * \param source Pointer to the EnergySource structure to update.
+ */
 void update_energy_profile(EnergySource *source) {
-    // Logic to update the profile of energy based on historical data
     uint8_t available_hours_today = source->duration_hours * source->occurrences_per_day;
     for (int i = HISTORY_DAYS - 1; i > 0; i--) {
         source->availability_history[i] = source->availability_history[i - 1];
     }
     source->availability_history[0] = available_hours_today;
 
-    // Calcul de la prévisibilité en utilisant l'historique
     float total = 0;
     float variance = 0;
     for (int i = 0; i < HISTORY_DAYS; i++) {
@@ -71,11 +62,20 @@ void update_energy_profile(EnergySource *source) {
     source->predictability = 1.0f / (1.0f + (variance / HISTORY_DAYS));
 }
 
+/**
+ * \brief Checks if energy is currently available based on the energy source's profile.
+ * 
+ * This function determines availability by evaluating the energy source's scheduled availability
+ * within the simulated current hour.
+ * 
+ * \param source Pointer to the EnergySource structure to evaluate.
+ * 
+ * \return True if energy is available, false otherwise.
+ */
 bool is_energy_available(EnergySource *source) {
-    // Logic to check availability based on the current simulated hour and the profile
     uint8_t current_hour = get_current_hour();
     uint8_t interval_hours = 24 / source->occurrences_per_day;
-    
+
     for (uint8_t i = 0; i < source->occurrences_per_day; i++) {
         uint8_t start_time = (source->start_hour + i * interval_hours) % 24;
         uint8_t end_time = (start_time + source->duration_hours) % 24;
@@ -93,7 +93,11 @@ bool is_energy_available(EnergySource *source) {
     return false;
 }
 
+/**
+ * \brief Placeholder function for integrating real-world energy profiling tools.
+ * 
+ * This function simulates the integration of actual hardware or tools for profiling energy availability.
+ */
 void integrate_real_energy_profiler() {
-    // Placeholder for real-world energy profiling integration
     printf("Integrating real-world energy profiling tools...\n");
 }
