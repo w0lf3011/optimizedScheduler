@@ -58,4 +58,4 @@ dkms.conf
 output/*
 venv/*
 bin/*
-docs/*
+docs/latex/*
