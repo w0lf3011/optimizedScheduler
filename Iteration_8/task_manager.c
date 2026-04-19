@@ -1,139 +1,173 @@
 #include "task_manager.h"
-#include "hardware_abstraction.h"
-#include "error_handling.h"
+
+#include <stddef.h>
 #include <stdlib.h>
 
-/**
- * \brief Initializes a task queue with a specified capacity.
- * 
- * Allocates memory for a task queue and its internal array of tasks.
- * 
- * \param capacity The maximum number of tasks the queue can hold.
- * \return A pointer to the initialized task queue.
- */
+#include "error_handling.h"
+#include "hardware_abstraction.h"
+
+static void swap_tasks(Task** left, Task** right) {
+    Task* temp = *left;
+    *left = *right;
+    *right = temp;
+}
+
+static bool are_dependencies_met(const Task* task) {
+    for (uint8_t i = 0; i < task->num_dependencies; i++) {
+        if (task->dependencies[i] == NULL || !task->dependencies[i]->completed) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 TaskQueue* init_task_queue(uint8_t capacity) {
-    TaskQueue* queue = (TaskQueue*)malloc(sizeof(TaskQueue));
+    TaskQueue* queue = NULL;
+
+    if (capacity == 0) {
+        handle_error("Task queue capacity must be greater than zero");
+        return NULL;
+    }
+
+    queue = (TaskQueue*)malloc(sizeof(TaskQueue));
+    if (queue == NULL) {
+        handle_error("Failed to allocate task queue");
+        return NULL;
+    }
+
     queue->tasks = (Task**)malloc(sizeof(Task*) * capacity);
+    if (queue->tasks == NULL) {
+        free(queue);
+        handle_error("Failed to allocate task storage");
+        return NULL;
+    }
+
     queue->capacity = capacity;
     queue->size = 0;
     return queue;
 }
 
-/**
- * \brief Adds a task to the task queue.
- * 
- * Enqueues a task into the queue while maintaining the heap property
- * based on the heuristic metric of the tasks.
- * 
- * \param queue A pointer to the task queue.
- * \param task A pointer to the task to be added to the queue.
- * 
- * \note If the queue is full, an error is logged.
- */
 void enqueue_task(TaskQueue* queue, Task* task) {
-    if (queue->size < queue->capacity) {
-        queue->tasks[queue->size++] = task;
-        
-        // Heapify up to maintain heap property
-        int i = queue->size - 1;
-        while (i > 0) {
-            int parent = (i - 1) / 2;
-            if (queue->tasks[i]->heuristic_metric > queue->tasks[parent]->heuristic_metric) {
-                Task* temp = queue->tasks[i];
-                queue->tasks[i] = queue->tasks[parent];
-                queue->tasks[parent] = temp;
-                i = parent;
-            } else {
-                break;
-            }
-        }
-    } else {
+    if (queue == NULL || task == NULL) {
+        handle_error("Cannot enqueue a NULL queue or task");
+        return;
+    }
+
+    if (queue->size >= queue->capacity) {
         handle_error("Task queue is full");
+        return;
+    }
+
+    queue->tasks[queue->size] = task;
+    queue->size++;
+
+    for (uint8_t index = queue->size - 1; index > 0;) {
+        uint8_t parent = (index - 1) / 2;
+        if (queue->tasks[index]->heuristic_metric <= queue->tasks[parent]->heuristic_metric) {
+            break;
+        }
+
+        swap_tasks(&queue->tasks[index], &queue->tasks[parent]);
+        index = parent;
     }
 }
 
-/**
- * \brief Removes and returns the highest-priority task from the queue.
- * 
- * Dequeues the task with the highest heuristic metric from the queue.
- * Maintains the heap property after removal.
- * 
- * \param queue A pointer to the task queue.
- * \return A pointer to the highest-priority task, or NULL if the queue is empty.
- * 
- * \note If the queue is empty, an error is logged.
- */
 Task* dequeue_task(TaskQueue* queue) {
-    if (queue->size == 0) {
+    Task* highest_priority_task = NULL;
+
+    if (queue == NULL || queue->size == 0) {
         handle_error("Task queue is empty");
         return NULL;
     }
 
-    // Heapify down to maintain heap property
-    int i = 0;
-    while (i < queue->size) {
-        int left = 2 * i + 1;
-        int right = 2 * i + 2;
-        int largest = i;
-
-        if (left < queue->size && queue->tasks[left]->heuristic_metric > queue->tasks[largest]->heuristic_metric) {
-            largest = left;
-        }
-        if (right < queue->size && queue->tasks[right]->heuristic_metric > queue->tasks[largest]->heuristic_metric) {
-            largest = right;
-        }
-        if (largest != i) {
-            Task* temp = queue->tasks[i];
-            queue->tasks[i] = queue->tasks[largest];
-            queue->tasks[largest] = temp;
-            i = largest;
-        } else {
-            break;
-        }
+    highest_priority_task = queue->tasks[0];
+    queue->size--;
+    if (queue->size == 0) {
+        return highest_priority_task;
     }
 
-    return queue->tasks[--queue->size];
+    queue->tasks[0] = queue->tasks[queue->size];
+
+    for (uint8_t index = 0;;) {
+        uint8_t left = (uint8_t)(2 * index + 1);
+        uint8_t right = (uint8_t)(2 * index + 2);
+        uint8_t largest = index;
+
+        if (left < queue->size &&
+            queue->tasks[left]->heuristic_metric > queue->tasks[largest]->heuristic_metric) {
+            largest = left;
+        }
+
+        if (right < queue->size &&
+            queue->tasks[right]->heuristic_metric > queue->tasks[largest]->heuristic_metric) {
+            largest = right;
+        }
+
+        if (largest == index) {
+            break;
+        }
+
+        swap_tasks(&queue->tasks[index], &queue->tasks[largest]);
+        index = largest;
+    }
+
+    return highest_priority_task;
 }
 
-/**
- * \brief Frees memory allocated for the task queue.
- * 
- * Releases memory for the internal task array and the queue itself.
- * 
- * \param queue A pointer to the task queue to be freed.
- */
 void free_task_queue(TaskQueue* queue) {
+    if (queue == NULL) {
+        return;
+    }
+
     free(queue->tasks);
     free(queue);
 }
 
-/**
- * \brief Executes tasks from the queue based on their dependencies and metrics.
- * 
- * Processes tasks in the queue while checking their dependencies.
- * Executes each task if its dependencies are met.
- * 
- * \param queue A pointer to the task queue.
- * \param source A pointer to the energy source used for task scheduling.
- * \param goal_params A pointer to the goal parameters for task execution.
- */
 void execute_tasks(TaskQueue* queue, EnergySource* source, GoalParameters* goal_params) {
-    while (queue->size > 0) {
-        Task* task = dequeue_task(queue);
+    (void)source;
+    (void)goal_params;
 
-        // Validate dependencies
-        bool dependencies_met = true;
-        for (int j = 0; j < task->num_dependencies; j++) {
-            if (task->dependencies[j] != NULL) {
-                dependencies_met = false;
-                handle_error("Dependency error: Unmet dependencies.");
-                break;
+    if (queue == NULL) {
+        handle_error("Cannot execute tasks from a NULL queue");
+        return;
+    }
+
+    while (queue->size > 0) {
+        Task* deferred[MAX_TASKS];
+        uint8_t deferred_count = 0;
+        bool progress_made = false;
+
+        while (queue->size > 0) {
+            Task* task = dequeue_task(queue);
+            if (task == NULL) {
+                continue;
             }
+
+            if (!are_dependencies_met(task)) {
+                if (deferred_count >= MAX_TASKS) {
+                    handle_error("Too many deferred tasks while resolving dependencies");
+                    return;
+                }
+
+                deferred[deferred_count] = task;
+                deferred_count++;
+                continue;
+            }
+
+            task->taskFunction();
+            task->completed = true;
+            delay(task->delay_ms);
+            progress_made = true;
         }
 
-        if (dependencies_met) {
-            task->taskFunction();
-            delay(task->delay_ms);
+        for (uint8_t i = 0; i < deferred_count; i++) {
+            enqueue_task(queue, deferred[i]);
+        }
+
+        if (!progress_made) {
+            handle_error("Dependency cycle detected or no executable task available");
+            return;
         }
     }
 }

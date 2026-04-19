@@ -17,6 +17,11 @@
  * \return True if the model is loaded successfully, false otherwise.
  */
 bool load_tinyml_model(TinyMLModel* ml_model, const uint8_t* model_data, size_t model_size, uint8_t* tensor_arena, size_t tensor_arena_size) {
+    (void)ml_model;
+    (void)model_data;
+    (void)model_size;
+    (void)tensor_arena;
+    (void)tensor_arena_size;
     // Model loading logic commented for demonstration.
     return true;
 }
@@ -31,6 +36,9 @@ bool load_tinyml_model(TinyMLModel* ml_model, const uint8_t* model_data, size_t 
  * \return Predicted energy availability as a float value.
  */
 float predict_energy(TinyMLModel* ml_model, const float* input, size_t input_length) {
+    (void)ml_model;
+    (void)input;
+    (void)input_length;
     // Prediction logic commented for demonstration.
     return 1.0f;
 }
@@ -44,6 +52,10 @@ float predict_energy(TinyMLModel* ml_model, const float* input, size_t input_len
  * \param source Pointer to the EnergySource structure to update.
  */
 void update_energy_profile(EnergySource *source) {
+    if (source == NULL) {
+        return;
+    }
+
     uint8_t available_hours_today = source->duration_hours * source->occurrences_per_day;
     for (int i = HISTORY_DAYS - 1; i > 0; i--) {
         source->availability_history[i] = source->availability_history[i - 1];
@@ -73,6 +85,10 @@ void update_energy_profile(EnergySource *source) {
  * \return True if energy is available, false otherwise.
  */
 bool is_energy_available(EnergySource *source) {
+    if (source == NULL || source->occurrences_per_day == 0) {
+        return false;
+    }
+
     uint8_t current_hour = get_current_hour();
     uint8_t interval_hours = 24 / source->occurrences_per_day;
 

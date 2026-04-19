@@ -21,7 +21,8 @@ This project implements an energy-aware task scheduler for embedded systems, cap
 
 ## Repository Structure
 
-- `Iteration_0` to `Iteration_7`: Directories containing code and documentation for each development iteration, showcasing the evolution of the scheduler.
+- `Iteration_0` to `Iteration_8`: Directories containing code and documentation for each development iteration, showcasing the evolution of the scheduler.
+- `Iteration_8`: Latest functional iteration, with the current energy-aware scheduling flow, dependency handling, and simulation entry point.
 - `doc/soa`: Documentation files, including the state-of-the-art analysis related to the project.
 - `Doxyfile`: Configuration for Doxygen
 - `LICENSE`: The project's licensing information.
@@ -75,14 +76,23 @@ To explore or contribute to the project:
 
 1. **Compile the project**
    ```bash
-   gcc -o scheduler src/*.c -I include
+   gcc -Wall -Wextra -pedantic -o bin/iteration_8 Iteration_8/*.c
    ```
 
 2. **Run the program**
    ```bash
-   ./scheduler [duration_days]
+   ./bin/iteration_8 [duration_days]
    ```
-   [duration_days] Number of simulation days (default is infinite if omitted).
+   `[duration_days]` is the number of simulated days. `0` enables infinite mode, and omitting the argument runs a 1-day simulation by default.
+
+### Current reference implementation
+
+If you are resuming the project, start with `Iteration_8`. This is the iteration that currently matches the repository README and makefile.
+
+- `Iteration_8/main.c`: Simulation entry point, task registration, dependency wiring, and energy-aware execution loop.
+- `Iteration_8/task_manager.c`: Priority queue implementation and dependency-aware task execution.
+- `Iteration_8/energy_manager.c`: Energy availability model and predictability profile update.
+- `Iteration_8/hardware_abstraction.c`: Simulated platform services such as delay, deep sleep, and LED feedback.
 
 
 ### Run locally all Iterations multiple times
@@ -108,6 +118,8 @@ This run option will incremently run all iterations until the last one configure
 
 ## Documentation
 Detailed documentation for each iteration is available within the respective directories. The `doc/soa` directory contains the state-of-the-art analysis and other relevant documents.
+
+The Doxygen configuration should target `Iteration_8` when generating API documentation for the current codebase snapshot.
 
 
 ## Contributing

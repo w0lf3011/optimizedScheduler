@@ -63,6 +63,15 @@ bool load_tinyml_model(TinyMLModel* ml_model, const uint8_t* model_data, size_t 
 float predict_energy(TinyMLModel* ml_model, const float* input, size_t input_length);
 
 /**
+ * \brief Returns the current simulated hour.
+ *
+ * The implementation is provided by the main simulation entry point.
+ *
+ * \return Current simulated hour in the range 0-23.
+ */
+uint8_t get_current_hour(void);
+
+/**
  * \brief Updates the energy source profile by recording historical data and calculating predictability.
  * 
  * This function shifts historical availability data, calculates the mean and variance of availability,
@@ -70,7 +79,7 @@ float predict_energy(TinyMLModel* ml_model, const float* input, size_t input_len
  * 
  * \param source Pointer to the EnergySource structure to update.
  */
-void update_energy_profile(EnergySource *source);
+void update_energy_profile(EnergySource* source);
 
 /**
  * \brief Checks if energy is currently available based on the energy source's profile.
@@ -82,7 +91,7 @@ void update_energy_profile(EnergySource *source);
  * 
  * \return True if energy is available, false otherwise.
  */
-bool is_energy_available(EnergySource *source);
+bool is_energy_available(EnergySource* source);
 
 /**
  * \brief Integrates real-world energy profiling tools.

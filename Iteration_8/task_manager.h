@@ -1,105 +1,103 @@
 #ifndef TASK_MANAGER_H
 #define TASK_MANAGER_H
 
-#include <stdint.h>
 #include <stdbool.h>
+#include <stdint.h>
+
 #include "energy_manager.h"
 
-/// \brief Maximum number of tasks in the queue.
+/**
+ * \brief Maximum number of tasks supported by the demo scheduler queue.
+ */
 #define MAX_TASKS 10
 
 /**
- * \brief Represents a task with various attributes for scheduling.
+ * \brief Describes a schedulable unit of work.
+ *
+ * Each task exposes an execution function, timing and scheduling metadata,
+ * and an optional dependency list used by the scheduler before execution.
  */
 typedef struct Task {
-    void (*taskFunction)();      ///< Pointer to the function implementing the task.
-    uint32_t delay_ms;           ///< Delay in milliseconds before executing the task.
-    uint8_t priority;            ///< Priority of the task (higher value = higher priority).
-    uint8_t weight;              ///< Weight representing the execution cost or duration.
-    bool critical;               ///< Indicates if the task is critical for resilience.
-    float heuristic_metric;      ///< Heuristic metric for task scheduling decisions.
-    struct Task** dependencies;  ///< Array of pointers to dependent tasks.
-    uint8_t num_dependencies;    ///< Number of dependencies for the task.
+    void (*taskFunction)();      ///< Function executed when the task is scheduled.
+    uint32_t delay_ms;           ///< Delay applied after task execution.
+    uint8_t priority;            ///< Base priority used by the heuristic scheduler.
+    uint8_t weight;              ///< Relative execution cost used in the heuristic score.
+    bool critical;               ///< Whether the task is important for resilience-oriented scheduling.
+    float heuristic_metric;      ///< Computed score used by the priority queue.
+    bool completed;              ///< Completion marker for the current scheduling cycle.
+    struct Task** dependencies;  ///< Tasks that must complete before this task may run.
+    uint8_t num_dependencies;    ///< Number of task dependencies.
 } Task;
 
 /**
- * \brief Represents a priority-based task queue.
+ * \brief Heap-backed priority queue of tasks.
  */
 typedef struct TaskQueue {
-    Task** tasks;                ///< Array of pointers to tasks in the queue.
-    uint8_t capacity;            ///< Maximum capacity of the queue.
-    uint8_t size;                ///< Current number of tasks in the queue.
+    Task** tasks;      ///< Heap storage for queued tasks.
+    uint8_t capacity;  ///< Maximum number of tasks accepted by the queue.
+    uint8_t size;      ///< Current number of queued tasks.
 } TaskQueue;
 
 /**
- * \brief Defines the objectives for task scheduling.
+ * \brief High-level optimization goal for the scheduler.
  */
 typedef enum {
-    MAXIMIZE_TASKS,              ///< Maximize the number of tasks executed.
-    MAXIMIZE_RESILIENCE          ///< Maximize resilience by prioritizing critical tasks.
+    MAXIMIZE_TASKS,       ///< Favor overall throughput.
+    MAXIMIZE_RESILIENCE   ///< Favor critical tasks and system continuity.
 } GoalType;
 
 /**
- * \brief Parameters defining the scheduling goal and simulation duration.
+ * \brief Runtime parameters for a simulation session.
  */
 typedef struct {
-    GoalType goal;               ///< Selected scheduling goal.
-    uint8_t duration_days;       ///< Duration of the simulation in days.
+    GoalType goal;        ///< Scheduler optimization objective.
+    uint8_t duration_days;///< Number of simulated days to execute.
 } GoalParameters;
 
 /**
- * \brief Initializes a task queue.
- * 
- * Allocates memory for a task queue and its internal array of tasks.
- * 
- * \param capacity Maximum number of tasks the queue can hold.
- * \return Pointer to the initialized task queue.
+ * \brief Allocates and initializes a task queue.
+ *
+ * \param capacity Maximum number of tasks supported by the queue.
+ * \return Pointer to the queue, or NULL if allocation fails.
  */
 TaskQueue* init_task_queue(uint8_t capacity);
 
 /**
- * \brief Adds a task to the task queue.
- * 
- * Inserts a task into the queue while maintaining the priority order
- * based on the heuristic metric.
- * 
- * \param queue Pointer to the task queue.
- * \param task Pointer to the task to be added to the queue.
- * 
- * \note Logs an error if the queue is full.
+ * \brief Inserts a task into the priority queue.
+ *
+ * Tasks are ordered by their heuristic metric, highest score first.
+ *
+ * \param queue Target queue.
+ * \param task Task to insert.
  */
 void enqueue_task(TaskQueue* queue, Task* task);
 
 /**
- * \brief Removes and returns the highest-priority task from the queue.
- * 
- * Dequeues the task with the highest heuristic metric from the queue.
- * 
- * \param queue Pointer to the task queue.
- * \return Pointer to the highest-priority task, or NULL if the queue is empty.
- * 
- * \note Logs an error if the queue is empty.
+ * \brief Removes the task with the highest heuristic metric.
+ *
+ * \param queue Source queue.
+ * \return Highest-priority task, or NULL if the queue is empty.
  */
 Task* dequeue_task(TaskQueue* queue);
 
 /**
- * \brief Frees the memory allocated for the task queue.
- * 
- * Releases memory for the internal task array and the task queue itself.
- * 
- * \param queue Pointer to the task queue to be freed.
+ * \brief Releases all memory allocated for a task queue.
+ *
+ * \param queue Queue to free.
  */
 void free_task_queue(TaskQueue* queue);
 
 /**
- * \brief Executes tasks in the queue based on their dependencies and scheduling metrics.
- * 
- * Processes tasks in the queue while checking and validating their dependencies.
- * 
- * \param queue Pointer to the task queue.
- * \param source Pointer to the energy source used for task scheduling.
- * \param goal_params Pointer to the goal parameters for task execution.
+ * \brief Executes queued tasks while enforcing their dependencies.
+ *
+ * Tasks whose dependencies are not yet completed are deferred and retried
+ * within the current scheduling cycle. A scheduling error is reported if no
+ * progress can be made.
+ *
+ * \param queue Queue of tasks to execute.
+ * \param source Energy source associated with the current cycle.
+ * \param goal_params Goal configuration for the running simulation.
  */
 void execute_tasks(TaskQueue* queue, EnergySource* source, GoalParameters* goal_params);
 
-#endif // TASK_MANAGER_H
+#endif

@@ -28,6 +28,15 @@ void init_peripherals();
 void delay(uint32_t ms);
 
 /**
+ * \brief Sleeps for a specified duration in milliseconds.
+ *
+ * This low-level helper backs the higher-level delay and deep-sleep helpers.
+ *
+ * \param ms Duration of the sleep in milliseconds.
+ */
+void sleep_ms(uint32_t ms);
+
+/**
  * \brief Simulates entering deep sleep mode.
  * 
  * This function simulates a deep sleep state to conserve energy by delaying
